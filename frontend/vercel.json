@@ -1,16 +1,2 @@
-{
-  "version": 2,
-  "neturest": "iCMC",
-   "name": "oasi-frontend",
-  "Version": {
-    "src": [
-    { "title": [
-        "sh-index.html"
-    }
-  ],
-   "rwitters": [
-    { "title": [
-        "sp-index.html"
-    }
-}
+{   "version": 2}
 }
