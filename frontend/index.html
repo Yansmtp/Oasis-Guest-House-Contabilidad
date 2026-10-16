@@ -5,8 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Oasis Guest House</title>
     <script>
-        // Backend local en desarrollo
-        window.API_BASE_URL = 'http://localhost:3000/api';
+        // URL del backend. En desarrollo usa localhost.
+        // En producción (Vercel) reemplazar por la URL de Render, ej.:
+        // https://tu-backend.onrender.com/api
+        // Si window.API_BASE_URL ya está inyectado (variable de entorno), se respeta su valor.
+        window.API_BASE_URL = (typeof window.API_BASE_URL !== 'undefined' && window.API_BASE_URL)
+          ? window.API_BASE_URL
+          : 'http://localhost:3000/api';
     </script>
     <link rel="stylesheet" href="css/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">

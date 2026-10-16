@@ -22,7 +22,9 @@ build/
 
 # Prisma
 prisma/*.db
-prisma/migrations/
+
+# Migrations are version-controlled (no ignorar)
+# prisma/migrations/
 
 # Logs
 logs/
