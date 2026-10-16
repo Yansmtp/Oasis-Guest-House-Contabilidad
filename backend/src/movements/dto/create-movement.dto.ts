@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString, IsNumber, IsArray, ValidateNested, IsDate } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsNumber, IsArray, ValidateNested, IsDate, IsInt, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { MovementType } from '@prisma/client';
 import { MovementDetailDto } from './movement-detail.dto';
@@ -31,6 +31,19 @@ export class CreateMovementDto {
   @IsString()
   @IsOptional()
   currencyCode?: string;
+
+  @IsNumber()
+  @IsOptional()
+  rateAtTransaction?: number;
+
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  counterpartAccountId?: number;
+
+  @IsString()
+  @IsOptional()
+  adminPassword?: string;
 
   @IsArray()
   @ValidateNested({ each: true })

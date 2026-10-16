@@ -3,6 +3,7 @@ import { CostCentersService } from './cost-centers.service';
 import { CreateCostCenterDto } from './dto/create-cost-center.dto';
 import { UpdateCostCenterDto } from './dto/update-cost-center.dto';
 import { JwtAuthGuard } from '../shared/guards/jwt-auth.guard';
+import { AdminRoleGuard } from '../shared/guards/admin-role.guard';
 
 @Controller('cost-centers')
 @UseGuards(JwtAuthGuard)
@@ -57,6 +58,7 @@ export class CostCentersController {
   }
 
   @Delete(':id')
+  @UseGuards(AdminRoleGuard)
   remove(@Param('id') id: string) {
     return this.costCentersService.remove(+id);
   }

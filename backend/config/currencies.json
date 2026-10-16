@@ -10,11 +10,5 @@
     "name": "Peso Cubano",
     "rate": 0.0083,
     "isDefault": false
-  },
-  {
-    "code": "EUR",
-    "name": "Euro",
-    "rate": 0.92,
-    "isDefault": false
   }
 ]

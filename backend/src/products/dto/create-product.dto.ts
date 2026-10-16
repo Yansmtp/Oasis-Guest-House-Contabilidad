@@ -1,10 +1,9 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber, IsEnum, IsBoolean, Min } from 'class-validator';
-import { UnitType } from '@prisma/client';
+import { IsString, IsNotEmpty, IsOptional, IsNumber, IsBoolean, Min } from 'class-validator';
 
 export class CreateProductDto {
   @IsString()
-  @IsNotEmpty()
-  code: string;
+  @IsOptional()
+  code?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -14,12 +13,14 @@ export class CreateProductDto {
   @IsOptional()
   description?: string;
 
-  @IsEnum(UnitType)
-  unit: UnitType;
+  @IsString()
+  @IsNotEmpty()
+  unit: string;
 
   @IsNumber()
   @Min(0)
-  unitCost: number;
+  @IsOptional()
+  unitCost?: number;
 
   @IsNumber()
   @Min(0)

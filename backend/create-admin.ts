@@ -11,23 +11,31 @@ async function main() {
     where: { email },
   });
 
+  const hashedPassword = await bcrypt.hash(password, 10);
+  let user = existingUser;
+
   if (existingUser) {
-    console.log('⚠️ El usuario admin ya existe');
-    return;
+    user = await prisma.user.update({
+      where: { email },
+      data: {
+        name: existingUser.name || 'Administrador',
+        password: hashedPassword,
+        role: existingUser.role || 'ADMIN',
+      },
+    });
+    console.log('[admin] existing user, password reset');
+  } else {
+    user = await prisma.user.create({
+      data: {
+        email,
+        name: 'Administrador',
+        password: hashedPassword,
+        role: 'ADMIN',
+      },
+    });
+    console.log('[admin] user created');
   }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  const user = await prisma.user.create({
-    data: {
-      email,
-      name: 'Administrador', // ✅ CAMPO QUE FALTABA
-      password: hashedPassword,
-      role: 'ADMIN',
-    },
-  });
-
-  console.log('✅ Usuario admin creado correctamente');
   console.log({
     id: user.id,
     email: user.email,

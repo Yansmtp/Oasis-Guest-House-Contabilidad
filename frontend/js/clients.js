@@ -2,6 +2,10 @@ let clients = [];
 let currentClientPage = 1;
 let totalClientPages = 1;
 
+function generateAutoCode(prefix) {
+    return `${prefix}${Date.now().toString().slice(-8)}`;
+}
+
 // Cargar clientes
 async function loadClients(page = 1, search = '') {
     try {
@@ -40,36 +44,45 @@ function renderClientsTable() {
         return;
     }
     
+    const compact = typeof isCompactListView === 'function' && isCompactListView();
+
     clients.forEach(client => {
         const row = document.createElement('tr');
-        
-        row.innerHTML = `
-            <td>${client.code}</td>
-            <td>
-                <strong>${client.name}</strong>
-                ${client.address ? `<br><small>${client.address}</small>` : ''}
-            </td>
-            <td>${client.email || '-'}</td>
-            <td>${client.phone || '-'}</td>
-            <td>${client.taxId || '-'}</td>
-            <td>
-                <span class="status-badge ${client.isActive ? 'status-active' : 'status-inactive'}">
-                    ${client.isActive ? 'Activo' : 'Inactivo'}
-                </span>
-            </td>
-            <td class="actions">
-                <button class="btn btn-sm btn-outline" onclick="editClient(${client.id})" title="Editar">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn btn-sm btn-outline" onclick="deleteClient(${client.id})" title="Eliminar">
-                    <i class="fas fa-trash"></i>
-                </button>
-                <button class="btn btn-sm btn-outline" onclick="viewClientMovements(${client.id})" title="Movimientos">
-                    <i class="fas fa-exchange-alt"></i>
-                </button>
-            </td>
-        `;
-        
+        const canDelete = isAdmin();
+
+        if (compact) {
+            row.className = 'table-compact-row';
+            row.innerHTML = `<td colspan="7" class="table-compact-cell">${buildClientListItemHtml(client, { canDelete })}</td>`;
+        } else {
+            row.innerHTML = `
+                <td class="cell-compact">${client.code}</td>
+                <td class="cell-text">
+                    <strong>${client.name}</strong>
+                    ${client.address ? `<small>${client.address}</small>` : ''}
+                </td>
+                <td class="cell-text">${client.email || '-'}</td>
+                <td class="cell-text">${client.phone || '-'}</td>
+                <td class="cell-compact">${client.taxId || '-'}</td>
+                <td class="cell-compact">
+                    <span class="status-badge ${client.isActive ? 'status-active' : 'status-inactive'}">
+                        ${client.isActive ? 'Activo' : 'Inactivo'}
+                    </span>
+                </td>
+                <td class="actions">
+                    <button class="btn btn-sm btn-outline" onclick="editClient(${client.id})" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    ${canDelete ? `
+                    <button class="btn btn-sm btn-outline" onclick="deleteClient(${client.id})" title="Eliminar">
+                        <i class="fas fa-trash"></i>
+                    </button>` : ''}
+                    <button class="btn btn-sm btn-outline" onclick="viewClientMovements(${client.id})" title="Movimientos">
+                        <i class="fas fa-exchange-alt"></i>
+                    </button>
+                </td>
+            `;
+        }
+
         tbody.appendChild(row);
     });
 }
@@ -85,6 +98,7 @@ function showAddClientModal() {
     resetForm('client-form');
     document.getElementById('client-modal-title').textContent = 'Nuevo Cliente';
     document.getElementById('client-id').value = '';
+    document.getElementById('client-code').value = generateAutoCode('CLI-');
     showModal('client-modal');
 }
 
@@ -177,10 +191,83 @@ async function viewClientMovements(id) {
     try {
         const client = await apiRequest(`/clients/${id}`);
         const movements = await apiRequest(`/clients/${id}/movements`);
-        
-        // Implementar vista de movimientos del cliente
-        alert(`Movimientos del cliente: ${client.name}\nTotal: ${movements.length} movimientos`);
-        
+        const bodyEl = document.getElementById('client-detail-body');
+        const titleEl = document.getElementById('client-detail-title');
+        const subtitleEl = document.getElementById('client-detail-subtitle');
+        const badgeEl = document.getElementById('client-detail-status-badge');
+
+        if (titleEl) {
+            titleEl.textContent = `Cliente: ${client.name || client.code || '—'}`;
+        }
+        if (subtitleEl) {
+            subtitleEl.textContent = `Código: ${client.code || '—'}`;
+        }
+        if (badgeEl) {
+            badgeEl.textContent = client.isActive ? 'Activo' : 'Inactivo';
+            badgeEl.className = `status-badge ${client.isActive ? 'status-active' : 'status-inactive'}`;
+        }
+
+        if (bodyEl) {
+            const movementRows = movements.length
+                ? movements.slice(0, 8).map(movement => {
+                    const totalAmount = (movement.details || []).reduce(
+                        (sum, detail) => sum + Number(detail.totalCost || 0),
+                        0,
+                    );
+                    return `
+                        <tr>
+                            <td class="cell-compact">${escapeHtml(movement.documentNumber || movement.id || '')}</td>
+                            <td class="cell-text">${escapeHtml(formatDate(movement.date))}</td>
+                            <td class="cell-text">${escapeHtml(movement.type === 'ENTRADA' ? 'Entrada' : 'Salida')}</td>
+                            <td class="cell-currency text-right">${formatCurrency(totalAmount, movement.currencyCode || 'USD')}</td>
+                            <td class="cell-text">${escapeHtml(movement.user?.name || '—')}</td>
+                        </tr>
+                    `;
+                }).join('')
+                : '';
+
+            bodyEl.innerHTML = `
+                <div class="movement-detail-meta">
+                    <div class="movement-detail-meta-item">
+                        <label>Email</label>
+                        <span>${escapeHtml(client.email || '—')}</span>
+                    </div>
+                    <div class="movement-detail-meta-item">
+                        <label>Teléfono</label>
+                        <span>${escapeHtml(client.phone || '—')}</span>
+                    </div>
+                    <div class="movement-detail-meta-item">
+                        <label>Dirección</label>
+                        <span>${escapeHtml(client.address || '—')}</span>
+                    </div>
+                    <div class="movement-detail-meta-item">
+                        <label>RUC/NIT</label>
+                        <span>${escapeHtml(client.taxId || '—')}</span>
+                    </div>
+                </div>
+                <h4 class="movement-detail-section-title">
+                    <i class="fas fa-history"></i> Movimientos recientes (${movements.length})
+                </h4>
+                <div class="table-responsive movement-detail-products">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Documento</th>
+                                <th>Fecha</th>
+                                <th>Tipo</th>
+                                <th class="text-right">Total</th>
+                                <th>Usuario</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${movementRows || `<tr><td colspan="5" class="text-center movement-detail-empty">No hay movimientos registrados</td></tr>`}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        showModal('client-detail-modal');
     } catch (error) {
         showAlert('Error al cargar los movimientos del cliente', 'error');
     }

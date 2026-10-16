@@ -12,20 +12,35 @@ enum MovementType {
   SALIDA
 }
 
-enum UnitType {
-  UNIDAD
-  KILOGRAMO
-  GRAMO
-  LIBRA
-  ONZA
-  LITRO
-  MILILITRO
-  GALON
-  CAJA
-  POMO
-  PAR
-  METRO
-  CENTIMETRO
+enum MovementStatus {
+  POSTED
+  REVERSED
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum JournalEntryStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
+enum AccountingPeriodStatus {
+  OPEN
+  CLOSED
+}
+
+enum JournalEntryKind {
+  GENERAL
+  INVENTORY_OPENING
+  INVENTORY_MOVEMENT
+  REVERSAL
 }
 
 model User {
@@ -39,6 +54,9 @@ model User {
 
   movements Movement[]
   auditLogs AuditLog[]
+  createdJournalEntries JournalEntry[] @relation("JournalCreatedBy")
+  postedJournalEntries JournalEntry[] @relation("JournalPostedBy")
+  closedAccountingPeriods AccountingPeriod[] @relation("AccountingPeriodClosedBy")
 }
 
 
@@ -47,7 +65,7 @@ model Product {
   code        String   @unique
   name        String
   description String?
-  unit        UnitType
+  unit        String
   unitCost    Decimal  @default(0)
   stock       Decimal  @default(0)
   minStock    Decimal  @default(0)
@@ -57,6 +75,7 @@ model Product {
   updatedAt   DateTime @updatedAt
 
   movements   MovementDetail[]
+  journalLines JournalLine[]
 }
 
 model Client {
@@ -84,11 +103,13 @@ model CostCenter {
   updatedAt   DateTime @updatedAt
 
   movements   Movement[]
+  journalLines JournalLine[]
 }
 
 model Movement {
   id            Int             @id @default(autoincrement())
   type          MovementType
+  status        MovementStatus  @default(POSTED)
   date          DateTime        @default(now())
   documentNumber String?
   description   String?
@@ -100,14 +121,23 @@ model Movement {
   client        Client?         @relation(fields: [clientId], references: [id])
   costCenterId  Int?
   costCenter    CostCenter?     @relation(fields: [costCenterId], references: [id])
+  counterpartAccountId Int?
+  counterpartAccount Account?   @relation("MovementCounterpartAccount", fields: [counterpartAccountId], references: [id], onDelete: Restrict)
   userId        Int
   user          User            @relation(fields: [userId], references: [id])
   
   // Detalles
   details       MovementDetail[]
+  accountingEntry JournalEntry?
+  reversalOfId  Int?            @unique
+  reversalOf    Movement?       @relation("MovementReversals", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversal      Movement?       @relation("MovementReversals")
+  reversedAt    DateTime?
   
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
+
+  @@index([status, date])
 }
 
 model MovementDetail {
@@ -133,9 +163,103 @@ model Company {
   email       String?
   website     String?
   logo        String?
+  functionalCurrencyCode String @default("USD")
+  inventoryAccountId Int?
+  inventoryAccount Account? @relation("CompanyInventoryAccount", fields: [inventoryAccountId], references: [id], onDelete: Restrict)
+  accountingCutoverAt DateTime? @db.Date
   lowStockThreshold Decimal @default(10)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model Account {
+  id           Int         @id @default(autoincrement())
+  code         String      @unique
+  name         String
+  type         AccountType
+  description  String?
+  isActive     Boolean     @default(true)
+  parentId     Int?
+  parent       Account?    @relation("AccountHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children     Account[]   @relation("AccountHierarchy")
+  inventoryCompanies Company[] @relation("CompanyInventoryAccount")
+  movementCounterparts Movement[] @relation("MovementCounterpartAccount")
+  journalLines JournalLine[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([type, isActive])
+  @@index([parentId])
+}
+
+model AccountingPeriod {
+  id         Int                    @id @default(autoincrement())
+  name       String                 @unique
+  startsAt   DateTime               @db.Date
+  endsAt     DateTime               @db.Date
+  status     AccountingPeriodStatus @default(OPEN)
+  closedAt   DateTime?
+  closedById Int?
+  closedBy   User?                  @relation("AccountingPeriodClosedBy", fields: [closedById], references: [id], onDelete: Restrict)
+  entries    JournalEntry[]
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+
+  @@index([startsAt, endsAt, status])
+}
+
+model JournalEntry {
+  id               Int                @id @default(autoincrement())
+  entryNumber      Int                @unique @default(autoincrement())
+  date             DateTime           @db.Date
+  description      String
+  reference        String?
+  kind             JournalEntryKind   @default(GENERAL)
+  status           JournalEntryStatus @default(DRAFT)
+  periodId         Int?
+  period           AccountingPeriod?  @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  createdById      Int
+  createdBy        User               @relation("JournalCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  postedById       Int?
+  postedBy         User?              @relation("JournalPostedBy", fields: [postedById], references: [id], onDelete: Restrict)
+  postedAt         DateTime?
+  reversalOfId     Int?               @unique
+  reversalOf       JournalEntry?      @relation("JournalReversals", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversal         JournalEntry?      @relation("JournalReversals")
+  sourceMovementId Int?               @unique
+  sourceMovement   Movement?          @relation(fields: [sourceMovementId], references: [id], onDelete: Restrict)
+  lines            JournalLine[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([date, status])
+  @@index([periodId, status])
+  @@index([createdById, createdAt])
+}
+
+model JournalLine {
+  id             Int          @id @default(autoincrement())
+  journalEntryId Int
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Restrict)
+  accountId      Int
+  account        Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  productId       Int?
+  product         Product?     @relation(fields: [productId], references: [id], onDelete: Restrict)
+  costCenterId   Int?
+  costCenter     CostCenter?  @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  description    String?
+  debit          Decimal      @default(0) @db.Decimal(20, 6)
+  credit         Decimal      @default(0) @db.Decimal(20, 6)
+  currencyCode   String?
+  originalDebit  Decimal?     @db.Decimal(20, 6)
+  originalCredit Decimal?     @db.Decimal(20, 6)
+  exchangeRate   Decimal?     @db.Decimal(20, 10)
+  createdAt      DateTime     @default(now())
+
+  @@index([journalEntryId])
+  @@index([accountId, journalEntryId])
+  @@index([productId, journalEntryId])
+  @@index([costCenterId, journalEntryId])
 }
 
 model AuditLog {
@@ -160,4 +284,13 @@ model CurrencyRate {
   createdAt     DateTime @default(now())
 
   @@index([code, effectiveFrom])
+}
+
+model Currency {
+  code      String   @id
+  name      String
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

@@ -1,6 +1,37 @@
-const API_BASE_URL = 'http://localhost:3000/api';
+// Desarrollo local: siempre usa backend en localhost:3000 a menos que window.API_BASE_URL se sobreescriba manualmente.
+const API_BASE_URL = (typeof window !== 'undefined' && window.API_BASE_URL)
+  ? window.API_BASE_URL
+  : 'http://localhost:3000/api';
 let currentUser = null;
 let currentPage = 1;
+
+const BRAND_LOGO_ASSETS = {
+    dark: 'img/logo-light.png',
+    light: 'img/logo-dark.png',
+    default: 'img/logo.png'
+};
+const openModals = [];
+
+function applyContextBrandLogos(root = document) {
+    const logos = root.querySelectorAll('img[data-logo-bg]');
+    logos.forEach((logo) => {
+        const backgroundTone = String(logo.dataset.logoBg || '').toLowerCase();
+        const preferredLogo = BRAND_LOGO_ASSETS[backgroundTone] || BRAND_LOGO_ASSETS.default;
+        const fallbackLogo = BRAND_LOGO_ASSETS.default;
+        const originalOnError = logo.onerror;
+
+        logo.onerror = () => {
+            if (logo.src.includes(fallbackLogo)) {
+                if (typeof originalOnError === 'function') originalOnError.call(logo);
+                return;
+            }
+            logo.onerror = originalOnError || null;
+            logo.src = fallbackLogo;
+        };
+
+        logo.src = preferredLogo;
+    });
+}
 
 // Utilidades de autenticación
 function getToken() {
@@ -37,6 +68,7 @@ function clearCurrentUser() {
 
 // Utilidades de API
 async function apiRequest(endpoint, options = {}) {
+    const suppressErrorAlert = !!options.suppressErrorAlert;
     const token = getToken();
     const headers = {
         'Content-Type': 'application/json',
@@ -55,25 +87,54 @@ async function apiRequest(endpoint, options = {}) {
             headers,
         });
 
+        const contentType = (response.headers.get('content-type') || '').toLowerCase();
+        const isJsonResponse = contentType.includes('application/json');
+
+        const readBody = async () => {
+            if (isJsonResponse) {
+                return await response.json();
+            }
+            return { rawText: await response.text() };
+        };
+
         if (!response.ok) {
             if (response.status === 401) {
-                // Token expirado o inválido
                 logout();
-                throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
+                throw new Error('Sesion expirada. Por favor, inicie sesion nuevamente.');
             }
-            
-            const error = await response.json().catch(() => ({}));
-            throw new Error(error.message || `Error ${response.status}: ${response.statusText}`);
+
+            const errorBody = await readBody().catch(() => ({}));
+            const rawMessage = (errorBody && typeof errorBody === 'object')
+                ? (errorBody.message || errorBody.error || errorBody.rawText || '')
+                : '';
+            const compactMessage = String(rawMessage)
+                .replace(/<[^>]*>/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .slice(0, 180);
+
+            throw new Error(compactMessage || `Error ${response.status}: ${response.statusText}`);
         }
 
-        return await response.json();
+        const data = await readBody();
+        if (!isJsonResponse) {
+            const preview = String(data?.rawText || '')
+                .replace(/<[^>]*>/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .slice(0, 120);
+            throw new Error(`Respuesta no JSON desde ${url}${preview ? `: ${preview}` : ''}`);
+        }
+
+        return data;
     } catch (error) {
         console.error('API Request Error:', error);
-        showAlert(error.message || 'Error de conexión', 'error');
+        if (!suppressErrorAlert) {
+            showAlert(error.message || 'Error de conexion', 'error');
+        }
         throw error;
     }
 }
-
 // Utilidades de interfaz
 function showAlert(message, type = 'info') {
     // Remover alertas anteriores
@@ -125,6 +186,15 @@ function hideLoading() {
     }
 }
 
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function formatDate(dateString) {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -166,11 +236,21 @@ function parseNumberSafe(value) {
 
 function formatCurrency(amount, currencyCode = 'USD') {
     const n = parseNumberSafe(amount) || 0;
-    return new Intl.NumberFormat('es-ES', {
-        style: 'currency',
-        currency: currencyCode || 'USD',
-        minimumFractionDigits: 2
-    }).format(n);
+    const normalizedCode = (currencyCode || 'USD').toUpperCase();
+    try {
+        return new Intl.NumberFormat('es-ES', {
+            style: 'currency',
+            currency: normalizedCode,
+            minimumFractionDigits: 2
+        }).format(n);
+    } catch (e) {
+        return `${normalizedCode} ${formatNumber(n)}`;
+    }
+}
+
+function isAdmin() {
+    const user = getCurrentUser();
+    return String(user?.role || '').toUpperCase() === 'ADMIN';
 }
 
 function formatNumber(number) {
@@ -180,14 +260,77 @@ function formatNumber(number) {
     }).format(number);
 }
 
+const COMPACT_LIST_MEDIA = typeof window !== 'undefined'
+    ? window.matchMedia('(max-width: 991px)')
+    : null;
+
+function isCompactListView() {
+    return COMPACT_LIST_MEDIA ? COMPACT_LIST_MEDIA.matches : false;
+}
+
+/** Reportes: scroll horizontal en pantallas pequeñas (sin tarjetas por campo). */
+function refreshResponsiveTables(root) {
+    const scope = root && root.querySelectorAll ? root : document;
+    if (!scope.querySelectorAll) return;
+
+    scope.querySelectorAll(
+        '.movements-report-output .table, #report-content .table, #client-report-result .table, #movement-report-result .table'
+    ).forEach((table) => {
+        table.classList.remove('table-mobile-stack');
+        const wrap = table.closest('.table-responsive');
+        if (wrap) wrap.classList.add('table-report-scroll');
+    });
+}
+
+function initCompactListResponsive() {
+    if (window.__compactListResponsiveInit || !COMPACT_LIST_MEDIA) return;
+    window.__compactListResponsiveInit = true;
+
+    let timer = null;
+    const rerunVisibleLists = () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+            const productsSection = document.getElementById('products');
+            if (productsSection?.style.display !== 'none' && typeof renderProductsTable === 'function') {
+                renderProductsTable();
+            }
+            const movementsSection = document.getElementById('movements');
+            if (movementsSection?.style.display !== 'none' && typeof renderMovementsTable === 'function') {
+                renderMovementsTable();
+            }
+            const clientsSection = document.getElementById('clients');
+            if (clientsSection?.style.display !== 'none' && typeof renderClientsTable === 'function') {
+                renderClientsTable();
+            }
+            const costCentersSection = document.getElementById('cost-centers');
+            if (costCentersSection?.style.display !== 'none' && typeof renderCostCentersTable === 'function') {
+                renderCostCentersTable();
+            }
+            const dashboardSection = document.getElementById('dashboard');
+            if (dashboardSection?.style.display !== 'none' && typeof loadRecentMovements === 'function') {
+                loadRecentMovements();
+            }
+            const companySection = document.getElementById('company');
+            if (companySection?.style.display !== 'none' && typeof loadUsers === 'function') {
+                loadUsers();
+            }
+        }, 220);
+    };
+
+    COMPACT_LIST_MEDIA.addEventListener('change', rerunVisibleLists);
+    window.addEventListener('resize', rerunVisibleLists);
+}
+
 function toggleNavbar() {
     const navbarMenu = document.getElementById('navbar-menu');
     navbarMenu.classList.toggle('show');
+    document.body.classList.toggle('navbar-open', navbarMenu.classList.contains('show'));
 }
 
 function closeNavbar() {
     const navbarMenu = document.getElementById('navbar-menu');
     navbarMenu.classList.remove('show');
+    document.body.classList.remove('navbar-open');
 }
 
 // Marcar item activo del menú
@@ -238,19 +381,46 @@ async function fetchWithAuth(endpoint, options = {}) {
 window.setActiveMenu = setActiveMenu;
 window.fetchWithAuth = fetchWithAuth;
 window.parseNumberSafe = parseNumberSafe;
+window.isAdmin = isAdmin;
+window.refreshResponsiveTables = refreshResponsiveTables;
+window.isCompactListView = isCompactListView;
+window.initCompactListResponsive = initCompactListResponsive;
 
 // Utilidades de modal
 function showModal(modalId) {
-    document.getElementById('modal-overlay').style.display = 'block';
-    document.getElementById(modalId).style.display = 'block';
+    const modal = document.getElementById(modalId);
+    const overlay = document.getElementById('modal-overlay');
+    if (!modal || !overlay) return;
+
+    if (!openModals.includes(modalId)) {
+        openModals.push(modalId);
+    }
+
+    overlay.style.display = 'block';
+    modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
 }
 
-function closeModal() {
-    document.getElementById('modal-overlay').style.display = 'none';
-    const modals = document.querySelectorAll('.modal');
-    modals.forEach(modal => modal.style.display = 'none');
-    document.body.style.overflow = 'auto';
+function closeModal(modalId = null) {
+    const overlay = document.getElementById('modal-overlay');
+
+    if (modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) modal.style.display = 'none';
+        const idx = openModals.indexOf(modalId);
+        if (idx !== -1) openModals.splice(idx, 1);
+    } else {
+        document.querySelectorAll('.modal').forEach(modal => modal.style.display = 'none');
+        openModals.length = 0;
+    }
+
+    if (openModals.length === 0) {
+        if (overlay) overlay.style.display = 'none';
+        document.body.style.overflow = 'auto';
+    } else {
+        if (overlay) overlay.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+    }
 }
 
 // Utilidades de formulario
@@ -458,9 +628,12 @@ function verifySectionsExist() {
 }
 
 window.verifySectionsExist = verifySectionsExist;
+window.applyContextBrandLogos = applyContextBrandLogos;
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', () => {
+    applyContextBrandLogos();
+
     // Cerrar navbar al hacer clic fuera
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.navbar') && !e.target.closest('.navbar-toggle')) {

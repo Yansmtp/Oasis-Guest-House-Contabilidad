@@ -8,6 +8,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { LocalStrategy } from './local.strategy';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { LocalAuthGuard } from './local-auth.guard';
+import { AdminRoleGuard } from '../shared/guards/admin-role.guard';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { LocalAuthGuard } from './local-auth.guard';
     LocalStrategy,
     JwtAuthGuard,
     LocalAuthGuard,
+    AdminRoleGuard,
   ],
   exports: [AuthService, JwtAuthGuard],
 })

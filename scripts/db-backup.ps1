@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 function Get-EnvValue([string]$Path, [string]$Key) {
-    if (-not (Test-Path $Path)) { throw "No se encontró el archivo: $Path" }
+    if (-not (Test-Path $Path)) { throw "No se encontro el archivo: $Path" }
     $lines = Get-Content $Path
     foreach ($line in $lines) {
         if ($line.Trim().StartsWith("#")) { continue }
@@ -17,7 +17,7 @@ function Get-EnvValue([string]$Path, [string]$Key) {
 }
 
 function Parse-DatabaseUrl([string]$Url) {
-    if (-not $Url) { throw "DATABASE_URL no está definido" }
+    if (-not $Url) { throw "DATABASE_URL no esta definido" }
     if ($Url -notmatch "^postgresql:\/\/(.+?):(.+?)@(.+?):(\d+)\/(.+)$") {
         throw "DATABASE_URL no tiene el formato esperado (postgresql://user:pass@host:port/db)"
     }
@@ -36,37 +36,55 @@ $dbUrl = Get-EnvValue $envPath "DATABASE_URL"
 $db = Parse-DatabaseUrl $dbUrl
 
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-$backupDir = Join-Path $root $OutputDir
-$backupDir = Join-Path $backupDir $timestamp
-New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
+$backupBase = if ([System.IO.Path]::IsPathRooted($OutputDir)) { $OutputDir } else { Join-Path $root $OutputDir }
+$backupDir = Join-Path $backupBase $timestamp
 
 $dbDump = Join-Path $backupDir "db.backup"
 $uploadsPath = Join-Path $root "backend\uploads"
 $configPath = Join-Path $root "backend\config"
 $archivePath = Join-Path $backupDir "files.zip"
 
-$pgDump = (Get-Command pg_dump -ErrorAction SilentlyContinue)
-if (-not $pgDump) {
-    $candidates = @(
-        "C:\\Program Files\\PostgreSQL\\16\\bin\\pg_dump.exe",
-        "C:\\Program Files\\PostgreSQL\\15\\bin\\pg_dump.exe",
-        "C:\\Program Files\\PostgreSQL\\14\\bin\\pg_dump.exe",
-        "C:\\Program Files\\PostgreSQL\\13\\bin\\pg_dump.exe",
-        "C:\\Program Files (x86)\\PostgreSQL\\16\\bin\\pg_dump.exe",
-        "C:\\Program Files (x86)\\PostgreSQL\\15\\bin\\pg_dump.exe",
-        "C:\\Program Files (x86)\\PostgreSQL\\14\\bin\\pg_dump.exe",
-        "C:\\Program Files (x86)\\PostgreSQL\\13\\bin\\pg_dump.exe"
-    )
-    $pgDumpPath = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-    if (-not $pgDumpPath) {
-        throw "pg_dump no está disponible en PATH. Instala PostgreSQL o añade pg_dump al PATH."
-    }
+$pgDumpPath = $null
+$envPgDumpPath = Get-EnvValue $envPath "PG_DUMP_PATH"
+if ($envPgDumpPath -and (Test-Path $envPgDumpPath)) {
+    $pgDumpPath = $envPgDumpPath
 } else {
-    $pgDumpPath = $pgDump.Source
+    $pgDump = (Get-Command pg_dump -ErrorAction SilentlyContinue)
+    if ($pgDump) {
+        $pgDumpPath = $pgDump.Source
+    } else {
+        $candidates = @(
+            "C:\\Program Files\\PostgreSQL\\17\\bin\\pg_dump.exe",
+            "C:\\Program Files\\PostgreSQL\\16\\bin\\pg_dump.exe",
+            "C:\\Program Files\\PostgreSQL\\15\\bin\\pg_dump.exe",
+            "C:\\Program Files\\PostgreSQL\\14\\bin\\pg_dump.exe",
+            "C:\\Program Files\\PostgreSQL\\13\\bin\\pg_dump.exe",
+            "C:\\Program Files\\PostgreSQL\\12\\bin\\pg_dump.exe",
+            "C:\\Program Files (x86)\\PostgreSQL\\17\\bin\\pg_dump.exe",
+            "C:\\Program Files (x86)\\PostgreSQL\\16\\bin\\pg_dump.exe",
+            "C:\\Program Files (x86)\\PostgreSQL\\15\\bin\\pg_dump.exe",
+            "C:\\Program Files (x86)\\PostgreSQL\\14\\bin\\pg_dump.exe",
+            "C:\\Program Files (x86)\\PostgreSQL\\13\\bin\\pg_dump.exe",
+            "C:\\Program Files (x86)\\PostgreSQL\\12\\bin\\pg_dump.exe"
+        )
+        $pgDumpPath = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+    }
 }
+
+if (-not $pgDumpPath) {
+    throw "pg_dump no esta disponible en PATH. Instala PostgreSQL, define PG_DUMP_PATH en backend/.env o agrega pg_dump al PATH."
+}
+
+New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
 
 $env:PGPASSWORD = $db.Password
 & $pgDumpPath --format=c --file "$dbDump" --host "$($db.Host)" --port "$($db.Port)" --username "$($db.User)" --dbname "$($db.Db)"
+if ($LASTEXITCODE -ne 0) {
+    throw "pg_dump devolvio error (codigo $LASTEXITCODE). Verifica credenciales DATABASE_URL y permisos del usuario."
+}
+if (-not (Test-Path $dbDump)) {
+    throw "No se genero el archivo db.backup. El respaldo fallo."
+}
 
 $items = @()
 if (Test-Path $uploadsPath) { $items += $uploadsPath }

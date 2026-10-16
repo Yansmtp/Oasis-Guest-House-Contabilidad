@@ -1,127 +1,205 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { promises as fs } from 'fs';
-import { join } from 'path';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma, Currency as PrismaCurrency } from '@prisma/client';
 import { PrismaService } from '../shared/prisma/prisma.service';
-import { Prisma } from '@prisma/client';
+
+declare const fetch: any;
 
 export interface CurrencyEntry {
   code: string;
   name: string;
-  rate: number; // USD per 1 unit of currency (base USD)
+  rate: number;
   effectiveFrom?: Date;
   isDefault?: boolean;
 }
 
 @Injectable()
 export class CurrenciesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  private filePath = join(__dirname, '..', '..', '..', 'config', 'currencies.json');
-
-  private async readFile(): Promise<CurrencyEntry[]> {
-    const raw = await fs.readFile(this.filePath, 'utf8');
-    return JSON.parse(raw) as CurrencyEntry[];
+  private normalizeCode(code: string): string {
+    return String(code || '').trim().toUpperCase();
   }
 
-  private async writeFile(data: CurrencyEntry[]) {
-    await fs.writeFile(this.filePath, JSON.stringify(data, null, 2), 'utf8');
-  }
-
-  private async getLatestRates(codes: string[]) {
+  private async latestRates(codes: string[]) {
     if (!codes.length) return new Map<string, { rate: number; effectiveFrom: Date }>();
-
     const rows = await this.prisma.currencyRate.findMany({
       where: { code: { in: codes } },
       orderBy: [{ code: 'asc' }, { effectiveFrom: 'desc' }],
     });
-
-    const map = new Map<string, { rate: number; effectiveFrom: Date }>();
+    const latest = new Map<string, { rate: number; effectiveFrom: Date }>();
     for (const row of rows) {
-      if (!map.has(row.code)) {
-        map.set(row.code, {
-          rate: row.rate instanceof Prisma.Decimal ? row.rate.toNumber() : (row.rate as any),
-          effectiveFrom: row.effectiveFrom,
-        });
+      if (!latest.has(row.code)) {
+        latest.set(row.code, { rate: row.rate.toNumber(), effectiveFrom: row.effectiveFrom });
       }
     }
-    return map;
+    return latest;
+  }
+
+  private requireRate(row: { rate: number; effectiveFrom?: Date } | undefined, code: string): CurrencyEntry {
+    if (!row || !Number.isFinite(row.rate) || row.rate <= 0) {
+      throw new BadRequestException(`No existe una tasa positiva registrada para ${code}`);
+    }
+    return { code, name: '', rate: row.rate, effectiveFrom: row.effectiveFrom };
   }
 
   async getAll(): Promise<CurrencyEntry[]> {
-    const list = await this.readFile();
-    const codes = list.map(c => c.code);
-    const latestRates = await this.getLatestRates(codes);
-
-    return list.map(c => {
-      const latest = latestRates.get(c.code);
-      return {
-        ...c,
-        rate: latest?.rate ?? c.rate ?? (c.code === 'USD' ? 1 : 1),
-        effectiveFrom: latest?.effectiveFrom,
-      };
+    const currencies = await this.prisma.currency.findMany({
+      where: { isActive: true },
+      orderBy: [{ isDefault: 'desc' }, { code: 'asc' }],
     });
+    const rates = await this.latestRates(currencies.map(currency => currency.code));
+    return currencies.map(currency => ({
+      code: currency.code,
+      name: currency.name,
+      isDefault: currency.isDefault,
+      ...this.requireRate(rates.get(currency.code), currency.code),
+    }));
   }
 
   async get(code: string): Promise<CurrencyEntry | null> {
-    const list = await this.readFile();
-    const entry = list.find(c => c.code === code) || null;
-    if (!entry) return null;
-
-    const latestRates = await this.getLatestRates([code]);
-    const latest = latestRates.get(code);
-
+    const normalized = this.normalizeCode(code);
+    const currency: PrismaCurrency | null = await this.prisma.currency.findFirst({
+      where: { code: normalized, isActive: true },
+    });
+    if (!currency) return null;
+    const latest = (await this.latestRates([normalized])).get(normalized);
     return {
-      ...entry,
-      rate: latest?.rate ?? entry.rate ?? (code === 'USD' ? 1 : 1),
-      effectiveFrom: latest?.effectiveFrom,
+      ...this.requireRate(latest, normalized),
+      name: currency.name,
+      isDefault: currency.isDefault,
     };
   }
 
   async updateRate(code: string, rate: number) {
-    const list = await this.readFile();
-    const idx = list.findIndex(c => c.code === code);
-    if (idx === -1) throw new NotFoundException('Currency not found');
+    const normalized = this.normalizeCode(code);
+    if (normalized === 'EUR') {
+      throw new BadRequestException('EUR está deshabilitada temporalmente');
+    }
+    if (!Number.isFinite(rate) || rate <= 0) {
+      throw new BadRequestException('La tasa debe ser un número finito mayor que cero');
+    }
+    const currency = await this.prisma.currency.findFirst({
+      where: { code: normalized, isActive: true },
+      select: { code: true },
+    });
+    if (!currency) throw new NotFoundException('Currency not found');
 
     await this.prisma.currencyRate.create({
-      data: {
-        code,
-        rate,
-        effectiveFrom: new Date(),
-      },
+      data: { code: normalized, rate, effectiveFrom: new Date() },
     });
+    return this.get(normalized);
+  }
 
-    return this.get(code);
+  private normalizeExternalNumber(value: string): number {
+    let normalized = String(value || '').trim();
+    if (normalized.includes('.') && normalized.includes(',')) {
+      normalized = normalized.replace(/\./g, '').replace(/,/g, '.');
+    } else {
+      normalized = normalized.replace(/,/g, '.');
+    }
+    const parsed = Number(normalized.replace(/[^0-9.-]/g, ''));
+    if (!Number.isFinite(parsed)) {
+      throw new BadRequestException('No se pudo parsear la tasa externa');
+    }
+    return parsed;
+  }
+
+  async fetchExternalRate(code: string): Promise<number> {
+    const normalizedCode = this.normalizeCode(code);
+    if (normalizedCode !== 'CUP') {
+      throw new NotFoundException('Solo CUP se puede obtener de la fuente externa');
+    }
+
+    const response = await fetch('https://www.eltoque.com');
+    if (!response.ok) {
+      throw new BadRequestException('No se pudo obtener datos de la fuente externa');
+    }
+    const html = await response.text();
+    const match = html.match(/<tr[^>]*>\s*<td[^>]*>\s*<span[^>]*>\s*1\s*(?:<!--.*?-->)?\s*USD\s*<\/span>.*?<span[^>]*>\s*([0-9.,]+)\s*(?:<!--.*?-->)?\s*(?:&nbsp;|\s*)CUP\s*<\/span>/is);
+    if (!match) {
+      throw new BadRequestException('No se encontró la tasa CUP en el contenido externo');
+    }
+
+    const cupPerUsd = this.normalizeExternalNumber(match[1]);
+    if (cupPerUsd <= 0) {
+      throw new BadRequestException('La tasa CUP obtenida no es válida');
+    }
+    return 1 / cupPerUsd;
+  }
+
+  async updateRateFromExternal(code: string) {
+    return this.updateRate(code, await this.fetchExternalRate(code));
   }
 
   async setDefault(code: string) {
-    const list = await this.readFile();
-    if (!list.some(c => c.code === code)) throw new NotFoundException('Currency not found');
-    const newList = list.map(c => ({ ...c, isDefault: c.code === code }));
-    await this.writeFile(newList);
-    const updated = newList.find(c => c.code === code)!;
-    const latest = await this.get(code);
-    return { ...updated, rate: latest?.rate ?? updated.rate };
+    const normalized = this.normalizeCode(code);
+    if (normalized === 'EUR') {
+      throw new BadRequestException('EUR está deshabilitada temporalmente');
+    }
+
+    return this.prisma.$transaction(async tx => {
+      const currency = await tx.currency.findFirst({
+        where: { code: normalized, isActive: true },
+      });
+      if (!currency) throw new NotFoundException('Currency not found');
+
+      await tx.currency.updateMany({ data: { isDefault: false } });
+      await tx.currency.update({ where: { code: normalized }, data: { isDefault: true } });
+      return currency;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }
+
+  async createCurrency(input: { code: string; name: string; rate?: number; isDefault?: boolean }) {
+    const code = this.normalizeCode(input.code);
+    if (!/^[A-Z]{3}$/.test(code)) {
+      throw new BadRequestException('Código de moneda inválido');
+    }
+    if (code === 'EUR') {
+      throw new BadRequestException('EUR está deshabilitada temporalmente');
+    }
+    const name = String(input.name || '').trim();
+    if (!name) throw new BadRequestException('Nombre de moneda requerido');
+    const rate = code === 'USD' ? 1 : Number(input.rate);
+    if (!Number.isFinite(rate) || rate <= 0) {
+      throw new BadRequestException('La tasa debe ser mayor que 0');
+    }
+
+    try {
+      await this.prisma.$transaction(async tx => {
+        if (input.isDefault) await tx.currency.updateMany({ data: { isDefault: false } });
+        await tx.currency.create({
+          data: { code, name, isDefault: !!input.isDefault },
+        });
+        await tx.currencyRate.create({
+          data: { code, rate, effectiveFrom: new Date() },
+        });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('La moneda ya existe');
+      }
+      throw error;
+    }
+    return this.get(code);
   }
 
   async getRateAt(code: string, at: Date): Promise<number> {
-    if (code === 'USD') return 1;
+    const normalized = this.normalizeCode(code);
+    if (normalized === 'USD') return 1;
+    const currency = await this.prisma.currency.findFirst({
+      where: { code: normalized, isActive: true },
+      select: { code: true },
+    });
+    if (!currency) throw new NotFoundException(`La moneda ${normalized} no está configurada`);
 
     const row = await this.prisma.currencyRate.findFirst({
-      where: {
-        code,
-        effectiveFrom: { lte: at },
-      },
+      where: { code: normalized, effectiveFrom: { lte: at } },
       orderBy: { effectiveFrom: 'desc' },
+      select: { rate: true },
     });
-
-    if (row) {
-      return row.rate instanceof Prisma.Decimal ? row.rate.toNumber() : (row.rate as any);
+    if (!row || !row.rate.gt(0)) {
+      throw new BadRequestException(`No existe una tasa histórica de ${normalized} para la fecha indicada`);
     }
-
-    const list = await this.readFile();
-    const entry = list.find(c => c.code === code);
-    if (entry && typeof entry.rate === 'number') return entry.rate;
-
-    return 1;
+    return row.rate.toNumber();
   }
 }

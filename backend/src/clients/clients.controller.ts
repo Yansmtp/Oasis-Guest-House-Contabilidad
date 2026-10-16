@@ -3,6 +3,7 @@ import { ClientsService } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import { JwtAuthGuard } from '../shared/guards/jwt-auth.guard';
+import { AdminRoleGuard } from '../shared/guards/admin-role.guard';
 
 @Controller('clients')
 @UseGuards(JwtAuthGuard)
@@ -57,6 +58,7 @@ export class ClientsController {
   }
 
   @Delete(':id')
+  @UseGuards(AdminRoleGuard)
   remove(@Param('id') id: string) {
     return this.clientsService.remove(+id);
   }

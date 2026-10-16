@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../shared/prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { Prisma, MovementType } from '@prisma/client'; // <- Import correcto de Decimal
+import { MovementStatus, Prisma, MovementType } from '@prisma/client';
 
 // Helper para convertir Decimal a number
 function toNum(value: Prisma.Decimal | number): number {
@@ -14,9 +14,51 @@ function toNum(value: Prisma.Decimal | number): number {
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
 
+  private normalizeUnit(unit: string): string {
+    return String(unit || '').trim().replace(/\s+/g, ' ');
+  }
+
+  private getCurrentYear2Digits(date: Date = new Date()): string {
+    return String(date.getFullYear()).slice(-2);
+  }
+
+  private async generateNextCode(): Promise<string> {
+    const year = this.getCurrentYear2Digits();
+    const prefix = `PRD${year}`;
+
+    const latest = await this.prisma.product.findFirst({
+      where: { code: { startsWith: prefix } },
+      orderBy: { code: 'desc' },
+      select: { code: true },
+    });
+
+    const parsedSuffix = latest?.code
+      ? Number((latest.code.match(/^PRD\d{2}(\d{4})$/)?.[1]) || 0)
+      : 0;
+    let next = Number.isFinite(parsedSuffix) ? parsedSuffix + 1 : 1;
+    let candidate = `${prefix}${String(next).padStart(4, '0')}`;
+
+    while (await this.prisma.product.findUnique({ where: { code: candidate } })) {
+      next += 1;
+      candidate = `${prefix}${String(next).padStart(4, '0')}`;
+    }
+
+    return candidate;
+  }
+
+  async getNextCode() {
+    return { code: await this.generateNextCode() };
+  }
+
   async create(createProductDto: CreateProductDto) {
+    const code = (createProductDto.code || '').trim().toUpperCase() || await this.generateNextCode();
+    const unit = this.normalizeUnit(createProductDto.unit);
+    if (!unit) {
+      throw new BadRequestException('La unidad de medida es obligatoria');
+    }
+
     const existingProduct = await this.prisma.product.findUnique({
-      where: { code: createProductDto.code },
+      where: { code },
     });
 
     if (existingProduct) {
@@ -24,7 +66,12 @@ export class ProductsService {
     }
 
     return this.prisma.product.create({
-      data: createProductDto,
+      data: {
+        ...createProductDto,
+        code,
+        unit,
+        unitCost: createProductDto.unitCost ?? 0,
+      },
     });
   }
 
@@ -87,9 +134,19 @@ export class ProductsService {
   async update(id: number, updateProductDto: UpdateProductDto) {
     await this.findOne(id);
 
+    const unit = updateProductDto.unit !== undefined
+      ? this.normalizeUnit(updateProductDto.unit)
+      : undefined;
+    if (updateProductDto.unit !== undefined && !unit) {
+      throw new BadRequestException('La unidad de medida es obligatoria');
+    }
+
     return this.prisma.product.update({
       where: { id },
-      data: updateProductDto,
+      data: {
+        ...updateProductDto,
+        ...(unit !== undefined ? { unit } : {}),
+      },
     });
   }
 
@@ -118,7 +175,7 @@ export class ProductsService {
     const details = await this.prisma.movementDetail.findMany({
       where: {
         productId,
-        movement: { type: MovementType.ENTRADA },
+        movement: { type: MovementType.ENTRADA, status: MovementStatus.POSTED },
       },
       include: {
         movement: { select: { date: true } },

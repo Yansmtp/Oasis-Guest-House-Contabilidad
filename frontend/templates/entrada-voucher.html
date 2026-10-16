@@ -157,7 +157,7 @@
     
     <div class="voucher-container">
         <div class="voucher-header">
-            <img src="../img/logo.png" alt="Logo Empresa" class="company-logo" id="companyLogo">
+            <img src="../img/logo-dark.png" alt="Logo Empresa" class="company-logo" id="companyLogo" onerror="this.onerror=null;this.src='../img/logo.png';">
             <h1 class="voucher-title">VALE DE ENTRADA</h1>
             <h3 id="documentNumber">ENT-2024-000001</h3>
         </div>
@@ -303,7 +303,21 @@
                 const company = await fetchWithAuth('/company');
                 if (company.logo) {
                     const logoImg = document.getElementById('companyLogo');
-                    logoImg.src = `http://localhost:3000/uploads/${company.logo}`;
+                    const backendBase = `${window.location.protocol}//${window.location.hostname}:3000`;
+                    let logoUrl = String(company.logo).replace(/\\/g, '/');
+                    if (/^https?:\/\//i.test(logoUrl)) {
+                        const u = new URL(logoUrl);
+                        logoUrl = `${u.origin}${u.pathname}`;
+                    } else if (logoUrl.startsWith('/uploads/')) {
+                        logoUrl = `${backendBase}${logoUrl}`;
+                    } else if (logoUrl.includes('/uploads/')) {
+                        logoUrl = `${backendBase}${logoUrl.substring(logoUrl.indexOf('/uploads/'))}`;
+                    } else {
+                        logoImg.style.display = 'none';
+                        return;
+                    }
+                    const cacheKey = company.updatedAt ? new Date(company.updatedAt).getTime() : Date.now();
+                    logoImg.src = `${logoUrl}${logoUrl.includes('?') ? '&' : '?'}v=${cacheKey}`;
                     logoImg.onerror = () => {
                         logoImg.style.display = 'none';
                     };

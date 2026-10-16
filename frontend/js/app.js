@@ -1,5 +1,15 @@
 // Navegación entre secciones
 function showSection(sectionId) {
+    if (sectionId === 'company' && !isAdmin()) {
+        showAlert('Solo administradores pueden entrar a Configuración', 'warning');
+        return;
+    }
+
+    if (sectionId === 'accounting' && !isAdmin()) {
+        showAlert('Solo administradores pueden entrar a Contabilidad', 'warning');
+        return;
+    }
+
     // Ocultar todas las secciones
     const sections = document.querySelectorAll('.section');
     sections.forEach(section => {
@@ -29,10 +39,16 @@ function showSection(sectionId) {
             case 'cost-centers':
                 loadCostCenters();
                 break;
+            case 'accounting':
+                loadAccounting();
+                break;
             case 'company':
                 loadCompanyInfo();
                 if (typeof loadCurrencySettings === 'function') {
                     loadCurrencySettings();
+                }
+                if (typeof loadUsers === 'function') {
+                    loadUsers();
                 }
                 break;
         }
@@ -98,6 +114,7 @@ function initApp() {
                     'movimientos': 'movements',
                     'clientes': 'clients',
                     'centro': 'cost-centers',
+                    'contabilidad': 'accounting',
                     'empresa': 'company',
                     'administrativo': 'admin',
                     'admin': 'admin'
@@ -119,7 +136,15 @@ function initApp() {
 
     // Configurar navegación
     document.addEventListener('click', (e) => {
-        const link = e.target.closest('.nav-link');
+        if (document.body.classList.contains('navbar-open')) {
+            const insideMenu = e.target.closest('#navbar-menu');
+            const onToggle = e.target.closest('.navbar-toggle');
+            if (!insideMenu && !onToggle) {
+                closeNavbar();
+            }
+        }
+
+        const link = e.target.closest('.nav-link, .navbar-brand-link');
         if (!link) return;
 
         e.preventDefault();
@@ -130,6 +155,10 @@ function initApp() {
     });
 
     
+    if (typeof initCompactListResponsive === 'function') {
+        initCompactListResponsive();
+    }
+
     // Mostrar dashboard por defecto
     if (getToken()) {
         showSection('dashboard');

@@ -2,29 +2,53 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../shared/prisma/prisma.service';
 import { CreateCostCenterDto } from './dto/create-cost-center.dto';
 import { UpdateCostCenterDto } from './dto/update-cost-center.dto';
+import { MovementStatus } from '@prisma/client';
 
 @Injectable()
 export class CostCentersService {
   constructor(private prisma: PrismaService) {}
 
+  private async generateNextCode(prefix: string): Promise<string> {
+    const latest = await this.prisma.costCenter.findFirst({
+      where: { code: { startsWith: prefix } },
+      orderBy: { id: 'desc' },
+      select: { code: true },
+    });
+
+    const parsed = latest?.code ? Number(latest.code.replace(prefix, '')) : 0;
+    let next = Number.isFinite(parsed) ? parsed + 1 : 1;
+    let candidate = `${prefix}${String(next).padStart(5, '0')}`;
+
+    while (await this.prisma.costCenter.findUnique({ where: { code: candidate } })) {
+      next += 1;
+      candidate = `${prefix}${String(next).padStart(5, '0')}`;
+    }
+
+    return candidate;
+  }
+
   async create(createCostCenterDto: CreateCostCenterDto) {
-    // Verificar si el código ya existe
+    const code = (createCostCenterDto.code || '').trim() || await this.generateNextCode('CC-');
+
     const existingCostCenter = await this.prisma.costCenter.findUnique({
-      where: { code: createCostCenterDto.code },
+      where: { code },
     });
 
     if (existingCostCenter) {
-      throw new BadRequestException('El código del centro de costo ya existe');
+      throw new BadRequestException('El codigo del centro de costo ya existe');
     }
 
     return this.prisma.costCenter.create({
-      data: createCostCenterDto,
+      data: {
+        ...createCostCenterDto,
+        code,
+      },
     });
   }
 
   async findAll(page: number = 1, limit: number = 10, search: string = '', activeOnly: boolean = true) {
     const skip = (page - 1) * limit;
-    
+
     const where: any = {
       OR: [
         { code: { contains: search, mode: 'insensitive' } },
@@ -96,7 +120,7 @@ export class CostCentersService {
   }
 
   async update(id: number, updateCostCenterDto: UpdateCostCenterDto) {
-    await this.findOne(id); // Verificar que existe
+    await this.findOne(id);
 
     return this.prisma.costCenter.update({
       where: { id },
@@ -105,7 +129,7 @@ export class CostCentersService {
   }
 
   async remove(id: number) {
-    await this.findOne(id); // Verificar que existe
+    await this.findOne(id);
 
     return this.prisma.costCenter.update({
       where: { id },
@@ -114,7 +138,7 @@ export class CostCentersService {
   }
 
   async getCostCenterMovements(costCenterId: number, startDate?: Date, endDate?: Date) {
-    const where: any = { costCenterId };
+    const where: any = { costCenterId, status: MovementStatus.POSTED };
 
     if (startDate || endDate) {
       where.date = {};

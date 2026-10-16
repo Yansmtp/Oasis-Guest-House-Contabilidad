@@ -6,7 +6,7 @@ import { map } from 'rxjs/operators';
 import { AppModule } from './app.module';
 import helmet from 'helmet'; // <- cambio aquí
 import { ConfigService } from '@nestjs/config';
-import { join } from 'path';
+import { resolveUploadsRoot } from './shared/utils/uploads-root';
 
 @Injectable()
 class LogoUrlInterceptor implements NestInterceptor {
@@ -49,7 +49,6 @@ class LogoUrlInterceptor implements NestInterceptor {
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const configService = app.get(ConfigService);
-
   // Seguridad
   // Aplicamos helmet y permitimos carga cross-origin de recursos estáticos
   app.use(helmet());
@@ -61,7 +60,7 @@ async function bootstrap() {
   }
 
   app.enableCors({
-    origin: configService.get('FRONTEND_URL', 'http://localhost:8080'),
+    origin: true,
     credentials: true,
     // Incluir HEAD y PATCH para que las peticiones preflight permitan métodos PATCH
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -92,7 +91,8 @@ async function bootstrap() {
 
   // Servir carpeta uploads como estática en /uploads
   // Esto expone backend/uploads/* en http://HOST:PORT/uploads/*
-  app.useStaticAssets(join(__dirname, '..', 'uploads'), { prefix: '/uploads' });
+  const uploadsRoot = resolveUploadsRoot(configService.get('UPLOAD_PATH', './uploads'));
+  app.useStaticAssets(uploadsRoot, { prefix: '/uploads' });
 
   // Interceptor global: convierte rutas de 'logo' que empiezan con '/uploads' en URLs absolutas
   app.useGlobalInterceptors(new LogoUrlInterceptor());
@@ -102,3 +102,4 @@ async function bootstrap() {
   console.log(`🚀 Aplicación corriendo en: http://localhost:${port}`);
 }
 bootstrap();
+

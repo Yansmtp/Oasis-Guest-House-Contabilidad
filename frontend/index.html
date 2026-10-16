@@ -1,10 +1,17 @@
-button<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inventario - Casa de Renta</title>
+    <title>Oasis Guest House</title>
+    <script>
+        // Backend local en desarrollo
+        window.API_BASE_URL = 'http://localhost:3000/api';
+    </script>
     <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="icon" href="img/favicon.ico">
 </head>
@@ -12,14 +19,17 @@ button<!DOCTYPE html>
     <div id="app">
         <!-- Navbar -->
         <nav class="navbar">
-            <div class="navbar-brand">
-                <i class="fas fa-warehouse"></i>
-                <span>Inventario Casa Renta</span>
-            </div>
+            <a href="#" class="navbar-brand navbar-brand-link" data-section="dashboard" aria-label="Ir a inicio">
+                <img src="img/logo.png" alt="Oasis Guest House" class="brand-logo" data-logo-bg="dark">
+                <span class="navbar-brand-text">Oasis Guest House</span>
+            </a>
+            <a href="#" class="nav-link nav-link-home active" data-section="dashboard">
+                <i class="fas fa-home"></i><span class="nav-link-text">Inicio</span>
+            </a>
+            <button class="navbar-toggle" onclick="toggleNavbar()" aria-label="Abrir menú">
+                <i class="fas fa-bars"></i>
+            </button>
             <div class="navbar-menu" id="navbar-menu">
-                <a href="#" class="nav-link" data-section="dashboard">
-                    <i class="fas fa-home"></i> Inicio
-                </a>
                 <a href="#" class="nav-link" data-section="products">
                     <i class="fas fa-boxes"></i> Productos
                 </a>
@@ -35,6 +45,9 @@ button<!DOCTYPE html>
                 <a href="#" class="nav-link" data-section="reports">
                     <i class="fas fa-chart-bar"></i> Reportes
                 </a>
+                <a href="#" class="nav-link" data-section="accounting">
+                    <i class="fas fa-balance-scale"></i> Contabilidad
+                </a>
                 <a href="#" class="nav-link" data-section="company">
                     <i class="fas fa-cog"></i> Configuración
                 </a>
@@ -45,18 +58,15 @@ button<!DOCTYPE html>
                     </button>
                 </div>
             </div>
-            <button class="navbar-toggle" onclick="toggleNavbar()">
-                <i class="fas fa-bars"></i>
-            </button>
         </nav>
 
         <!-- Login Section -->
         <div id="login-section" class="container">
             <div class="login-container">
                 <div class="login-header">
-                    <i class="fas fa-warehouse fa-3x"></i>
-                    <h2>Sistema de Inventario</h2>
-                    <p>Casa de Renta</p>
+                    <img src="img/logo.png" alt="Oasis Guest House" class="login-logo" data-logo-bg="light">
+                    <h2>Oasis Guest House</h2>
+                    <p>Sistema de Inventario</p>
                 </div>
                 <form id="login-form" class="login-form">
                     <div class="form-group">
@@ -174,13 +184,13 @@ button<!DOCTYPE html>
 
                     <div class="row">
                         <div class="col-md-8">
-                            <div class="card">
+                            <div class="card dashboard-card" id="recent-movements-card">
                                 <div class="card-header">
                                     <h3><i class="fas fa-history"></i> Movimientos Recientes</h3>
                                 </div>
                                 <div class="card-body">
                                     <div class="table-responsive">
-                                        <table class="table" id="recent-movements">
+                                        <table class="table table-adaptive" id="recent-movements">
                                             <thead>
                                                 <tr>
                                                     <th>Fecha</th>
@@ -201,14 +211,17 @@ button<!DOCTYPE html>
                         </div>
                         
                         <div class="col-md-4">
-                            <div class="card">
+                            <div class="card dashboard-card" id="low-stock-card">
                                 <div class="card-header">
                                     <h3><i class="fas fa-exclamation-circle"></i> Productos Bajo Stock</h3>
                                 </div>
-                                <div class="card-body">
+                                <div class="card-body dashboard-low-stock-body">
                                     <div id="low-stock-list">
                                         <!-- Los productos se cargarán aquí -->
                                     </div>
+                                    <button id="low-stock-toggle-btn" class="btn btn-sm btn-outline btn-block mt-4" style="display: none;">
+                                        Mostrar más
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -240,7 +253,7 @@ button<!DOCTYPE html>
                             </div>
 
                             <div class="table-responsive">
-                                <table class="table" id="products-table">
+                                <table class="table table-adaptive" id="products-table">
                                     <thead>
                                         <tr>
                                             <th>Código</th>
@@ -251,7 +264,7 @@ button<!DOCTYPE html>
                                             <th>Costo Unit.</th>
                                             <th>Valor Total</th>
                                             <th>Estado</th>
-                                            <th>Acciones</th>
+                                            <th class="col-actions">Acciones</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -273,7 +286,7 @@ button<!DOCTYPE html>
                 <div class="container">
                     <div class="section-header">
                         <h1><i class="fas fa-exchange-alt"></i> Movimientos</h1>
-                        <div>
+                        <div class="section-header-actions">
                             <button class="btn btn-primary" onclick="showMovementModal('ENTRADA')">
                                 <i class="fas fa-arrow-down"></i> Nueva Entrada
                             </button>
@@ -311,7 +324,7 @@ button<!DOCTYPE html>
                             </div>
 
                             <div class="table-responsive">
-                                <table class="table" id="movements-table">
+                                <table class="table table-adaptive" id="movements-table">
                                     <thead>
                                         <tr>
                                             <th>Fecha</th>
@@ -321,7 +334,7 @@ button<!DOCTYPE html>
                                             <th>Descripción</th>
                                             <th>Productos</th>
                                             <th>Total</th>
-                                            <th>Acciones</th>
+                                            <th class="col-actions">Acciones</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -356,7 +369,7 @@ button<!DOCTYPE html>
                             </div>
 
                             <div class="table-responsive">
-                                <table class="table" id="clients-table">
+                                <table class="table table-adaptive" id="clients-table">
                                     <thead>
                                         <tr>
                                             <th>Código</th>
@@ -400,7 +413,7 @@ button<!DOCTYPE html>
                             </div>
 
                             <div class="table-responsive">
-                                <table class="table" id="cost-centers-table">
+                                <table class="table table-adaptive" id="cost-centers-table">
                                     <thead>
                                         <tr>
                                             <th>Código</th>
@@ -451,6 +464,16 @@ button<!DOCTYPE html>
                         </div>
                         
                         <div class="col-md-4">
+                            <div class="card report-card" onclick="showStockForecast()">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-chart-line fa-3x text-info"></i>
+                                    <h3>Pronóstico de Stock</h3>
+                                    <p>Estimación de días de stock restante por producto</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
                             <div class="card report-card" onclick="showClientReport()">
                                 <div class="card-body text-center">
                                     <i class="fas fa-users fa-3x text-warning"></i>
@@ -467,18 +490,270 @@ button<!DOCTYPE html>
                 </div>
             </section>
 
-            <!-- Company Section -->
-            <section id="company" class="section" style="display: none;">
+            <!-- Accounting Section -->
+            <section id="accounting" class="section" style="display: none;">
                 <div class="container">
-                    <h1><i class="fas fa-cog"></i> Configuración de Empresa</h1>
+                    <div class="section-header">
+                        <h1><i class="fas fa-balance-scale"></i> Contabilidad</h1>
+                        <div class="section-header-actions">
+                            <button class="btn btn-primary" onclick="openJournalEntryModal()">
+                                <i class="fas fa-plus"></i> Nuevo Asiento
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card" id="accounting-status-card" style="display: none;">
+                        <div class="card-body" id="accounting-status-content"></div>
+                    </div>
+
+                    <div class="accounting-tabs" id="accounting-tabs" role="tablist">
+                        <button type="button" class="accounting-tab active" data-tab="journal" onclick="switchAccountingTab('journal')">
+                            <i class="fas fa-book"></i> Asientos
+                        </button>
+                        <button type="button" class="accounting-tab" data-tab="accounts" onclick="switchAccountingTab('accounts')">
+                            <i class="fas fa-sitemap"></i> Cuentas
+                        </button>
+                        <button type="button" class="accounting-tab" data-tab="periods" onclick="switchAccountingTab('periods')">
+                            <i class="fas fa-calendar-alt"></i> Períodos
+                        </button>
+                        <button type="button" class="accounting-tab" data-tab="trial" onclick="switchAccountingTab('trial')">
+                            <i class="fas fa-balance-scale-right"></i> Balanza
+                        </button>
+                        <button type="button" class="accounting-tab" data-tab="opening" onclick="switchAccountingTab('opening')">
+                            <i class="fas fa-lock-open"></i> Apertura
+                        </button>
+                    </div>
+
+                    <!-- Panel: Asientos -->
+                    <div class="card accounting-panel" id="accounting-panel-journal">
+                        <div class="card-header">
+                            <h3>Libro Mayor · Asientos</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="row accounting-filters">
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label>Desde</label>
+                                        <input type="date" id="journal-filter-start" class="form-control">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label>Hasta</label>
+                                        <input type="date" id="journal-filter-end" class="form-control">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label>Estado</label>
+                                        <select id="journal-filter-status" class="form-control">
+                                            <option value="">Todos</option>
+                                            <option value="DRAFT">Borrador</option>
+                                            <option value="POSTED">Contabilizado</option>
+                                            <option value="REVERSED">Revertido</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 d-flex align-items-end">
+                                    <button class="btn btn-primary btn-block" onclick="loadJournalEntries()">
+                                        <i class="fas fa-search"></i> Filtrar
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-adaptive" id="journal-entries-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Número</th>
+                                            <th>Fecha</th>
+                                            <th>Descripción</th>
+                                            <th>Tipo</th>
+                                            <th>Estado</th>
+                                            <th>Débito</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Panel: Cuentas -->
+                    <div class="card accounting-panel" id="accounting-panel-accounts" style="display: none;">
+                        <div class="card-header">
+                            <h3>Plan de Cuentas</h3>
+                            <button class="btn btn-primary btn-sm" onclick="openAccountModal()">
+                                <i class="fas fa-plus"></i> Nueva Cuenta
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="search-bar">
+                                <input type="text" id="account-search" class="form-control"
+                                       placeholder="Buscar por código, nombre o tipo..."
+                                       oninput="renderAccountsTable()">
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-adaptive" id="accounts-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Código</th>
+                                            <th>Nombre</th>
+                                            <th>Tipo</th>
+                                            <th>Cuenta padre</th>
+                                            <th>Estado</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Panel: Períodos -->
+                    <div class="card accounting-panel" id="accounting-panel-periods" style="display: none;">
+                        <div class="card-header">
+                            <h3>Períodos Contables</h3>
+                            <button class="btn btn-primary btn-sm" onclick="openPeriodModal()">
+                                <i class="fas fa-plus"></i> Nuevo Período
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-adaptive" id="periods-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Nombre</th>
+                                            <th>Desde</th>
+                                            <th>Hasta</th>
+                                            <th>Estado</th>
+                                            <th>Cerrado por</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Panel: Balanza -->
+                    <div class="card accounting-panel" id="accounting-panel-trial" style="display: none;">
+                        <div class="card-header">
+                            <h3>Balanza de Comprobación</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="row accounting-filters">
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label>Desde</label>
+                                        <input type="date" id="trial-filter-start" class="form-control">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label>Hasta</label>
+                                        <input type="date" id="trial-filter-end" class="form-control">
+                                    </div>
+                                </div>
+                                <div class="col-md-3 d-flex align-items-end">
+                                    <button class="btn btn-primary btn-block" onclick="loadTrialBalance()">
+                                        <i class="fas fa-calculator"></i> Calcular
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="trial-balance-output"></div>
+                        </div>
+                    </div>
+
+                    <!-- Panel: Apertura -->
+                    <div class="card accounting-panel" id="accounting-panel-opening" style="display: none;">
+                        <div class="card-header">
+                            <h3>Apertura Contable de Inventario</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="accounting-opening-done" class="alert alert-info" style="display: none;"></div>
+                            <div id="accounting-opening-form-wrap">
+                                <p class="text-muted">
+                                    Registra el primer asiento del libro mayor: valoriza el inventario existente
+                                    (débito en la cuenta de inventario) contra el patrimonio de apertura. Una vez
+                                    realizada, todos los movimientos deberán indicar su cuenta de contrapartida.
+                                </p>
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="form-group">
+                                            <label>Fecha de corte *</label>
+                                            <input type="date" id="opening-date" class="form-control" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <div class="form-group">
+                                            <label>Descripción *</label>
+                                            <input type="text" id="opening-description" class="form-control" maxlength="500"
+                                                   value="Apertura contable de inventario" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="form-group">
+                                            <label>Cuenta de inventario *</label>
+                                            <select id="opening-inventory-account" class="form-control">
+                                                <option value="">Seleccionar</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="form-group">
+                                            <label>Patrimonio de apertura *</label>
+                                            <select id="opening-equity-account" class="form-control">
+                                                <option value="">Seleccionar</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table" id="opening-products-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Producto</th>
+                                                <th style="width: 16%;">Cantidad contada</th>
+                                                <th style="width: 16%;">Costo unitario</th>
+                                                <th style="width: 18%;">Valor</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                        <tfoot>
+                                            <tr>
+                                                <td colspan="3" class="text-right"><strong>Total inventario:</strong></td>
+                                                <td><strong id="opening-total">0.00</strong></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                                <button class="btn btn-primary" id="opening-submit-btn" onclick="submitInventoryOpening()">
+                                    <i class="fas fa-lock-open"></i> Realizar apertura contable
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Company Section -->
+            <section id="company" class="section company-section" style="display: none;">
+                <div class="container">
+                    <div class="section-header company-header">
+                        <h1><i class="fas fa-cog"></i> Configuración de Empresa</h1>
+                        <p class="company-subtitle text-muted">Ajustes generales, moneda, respaldo y usuarios del sistema.</p>
+                    </div>
                     
-                    <div class="row">
+                    <div class="row company-top-grid">
                         <div class="col-md-6">
-                            <div class="card">
+                            <div class="card company-card">
                                 <div class="card-header">
                                     <h3>Información de la Empresa</h3>
                                 </div>
-                                <div class="card-body">
+                                <div class="card-body company-card-body">
                                     <form id="company-form">
                                         <div class="form-group">
                                             <label>Nombre de la Empresa</label>
@@ -504,36 +779,36 @@ button<!DOCTYPE html>
                                             <label>Sitio Web</label>
                                             <input type="url" id="company-website" class="form-control">
                                         </div>
-                                        <div class="form-group">
-                                            <label>Umbral de Stock Bajo</label>
-                                            <input type="number" id="company-low-stock" class="form-control" min="0">
+                                        <div class="company-actions-row">
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="fas fa-save"></i> Guardar Cambios
+                                            </button>
                                         </div>
-                                        <button type="submit" class="btn btn-primary">
-                                            <i class="fas fa-save"></i> Guardar Cambios
-                                        </button>
                                     </form>
                                 </div>
                             </div>
                         </div>
                         
                         <div class="col-md-6">
-                            <div class="card">
+                            <div class="card company-card">
                                 <div class="card-header">
                                     <h3>Logo de la Empresa</h3>
                                 </div>
-                                <div class="card-body text-center">
+                                <div class="card-body text-center company-card-body company-logo-card-body">
                                     <div id="logo-preview" class="logo-preview">
                                         <img id="company-logo" src="" alt="Logo" style="max-width: 200px; max-height: 200px;">
                                         <p id="no-logo" style="display: none;">No hay logo cargado</p>
                                     </div>
-                                    <form id="logo-form" enctype="multipart/form-data">
+                                    <form id="logo-form" enctype="multipart/form-data" class="company-logo-form">
                                         <div class="form-group">
                                             <label for="logo-file">Seleccionar archivo (JPG, PNG, SVG)</label>
-                                            <input type="file" id="logo-file" class="form-control" accept=".jpg,.jpeg,.png,.svg">
+                                            <input type="file" id="logo-file" name="logo" class="form-control" accept=".jpg,.jpeg,.png,.svg">
                                         </div>
-                                        <button type="submit" class="btn btn-primary">
-                                            <i class="fas fa-upload"></i> Subir Logo
-                                        </button>
+                                        <div class="company-actions-row company-actions-center">
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="fas fa-upload"></i> Subir Logo
+                                            </button>
+                                        </div>
                                     </form>
                                 </div>
                             </div>
@@ -542,11 +817,11 @@ button<!DOCTYPE html>
 
                     <div class="row mt-4">
                         <div class="col-md-12">
-                            <div class="card">
+                            <div class="card company-card">
                                 <div class="card-header">
                                     <h3>Monedas y Tasa de Cambio</h3>
                                 </div>
-                                <div class="card-body">
+                                <div class="card-body company-card-body">
                                     <form id="currency-form">
                                         <div class="row">
                                             <div class="col-md-4">
@@ -562,11 +837,44 @@ button<!DOCTYPE html>
                                                     <small id="currency-effective" class="text-muted"></small>
                                                 </div>
                                             </div>
-                                            <div class="col-md-4 d-flex align-items-end">
+                                            <div class="col-md-4 d-flex align-items-end company-actions-align-end">
                                                 <button type="submit" class="btn btn-primary">
                                                     <i class="fas fa-save"></i> Guardar Tasa
                                                 </button>
                                             </div>
+                                        </div>
+                                    </form>
+                                    <hr>
+                                    <form id="currency-create-form">
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <div class="form-group">
+                                                    <label>Código</label>
+                                                    <input type="text" id="new-currency-code" class="form-control" maxlength="3" placeholder="Ej: MLC" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="form-group">
+                                                    <label>Nombre</label>
+                                                    <input type="text" id="new-currency-name" class="form-control" placeholder="Nombre moneda" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="form-group">
+                                                    <label>Tasa (USD por 1 unidad)</label>
+                                                    <input type="number" id="new-currency-rate" class="form-control" min="0.000001" step="0.000001" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-2 d-flex align-items-center">
+                                                <label class="mt-4">
+                                                    <input type="checkbox" id="new-currency-default"> Predeterminada
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="company-actions-row">
+                                            <button type="submit" class="btn btn-secondary">
+                                                <i class="fas fa-plus"></i> Agregar Moneda
+                                            </button>
                                         </div>
                                     </form>
                                 </div>
@@ -576,25 +884,70 @@ button<!DOCTYPE html>
 
                     <div class="row mt-4">
                         <div class="col-md-12">
-                            <div class="card">
+                            <div class="card company-card">
                                 <div class="card-header">
                                     <h3>Respaldo y Restablecimiento</h3>
                                 </div>
-                                <div class="card-body">
+                                <div class="card-body company-card-body">
                                     <p class="text-muted">
                                         Estas acciones afectan a la base de datos y archivos subidos (incluye logo).
                                     </p>
-                                    <div class="d-flex gap-2">
+                                    <div class="form-group">
+                                        <label>Ruta para guardar respaldos</label>
+                                        <input type="text" id="maintenance-backup-dir" class="form-control" placeholder="Ej: D:\RespaldosInventario">
+                                        <small class="text-muted d-block mt-2" id="maintenance-backup-dir-help"></small>
+                                    </div>
+                                    <div class="d-flex gap-2 company-actions-wrap">
                                         <button class="btn btn-secondary" id="maintenance-backup-btn">
                                             <i class="fas fa-download"></i> Crear Backup
                                         </button>
+                                    </div>
+                                    <div class="form-group mt-4">
+                                        <label>Ruta de la salva a restaurar</label>
+                                        <input type="text" id="maintenance-restore-dir" class="form-control" placeholder="Ej: D:\RespaldosInventario\20260224_220000">
+                                    </div>
+                                    <div class="d-flex gap-2 company-actions-wrap">
+                                        <button class="btn btn-warning" id="maintenance-restore-btn">
+                                            <i class="fas fa-upload"></i> Cargar Salva
+                                        </button>
                                         <button class="btn btn-danger" id="maintenance-reset-btn">
-                                            <i class="fas fa-bomb"></i> Formatear y Restablecer
+                                            <i class="fas fa-bomb"></i> Eliminar Datos y Restablecer
                                         </button>
                                     </div>
                                     <small class="text-muted d-block mt-2">
-                                        El restablecimiento hace backup antes de borrar.
+                                        El restablecimiento NO crea backup automatico. Asegure una salva previa.
                                     </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-4">
+                        <div class="col-md-12">
+                            <div class="card company-card" id="users-admin-card" style="display: none;">
+                                <div class="card-header">
+                                    <h3>Gestión de Usuarios</h3>
+                                </div>
+                                <div class="card-body company-card-body">
+                                    <div class="d-flex gap-2 company-actions-wrap">
+                                        <button class="btn btn-primary" id="users-new-btn">
+                                            <i class="fas fa-user-plus"></i> Nuevo Usuario
+                                        </button>
+                                    </div>
+                                    <div class="table-responsive mt-4">
+                                        <table class="table table-adaptive" id="users-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Nombre</th>
+                                                    <th>Email</th>
+                                                    <th>Rol</th>
+                                                    <th>Creado</th>
+                                                    <th>Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody></tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -610,7 +963,7 @@ button<!DOCTYPE html>
         <div id="product-modal" class="modal">
             <div class="modal-header">
                 <h3 id="product-modal-title">Nuevo Producto</h3>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <button class="modal-close" onclick="closeModal('product-modal')">&times;</button>
             </div>
             <div class="modal-body">
                 <form id="product-form">
@@ -627,32 +980,28 @@ button<!DOCTYPE html>
                         <label>Descripción</label>
                         <textarea id="product-description" class="form-control" rows="3"></textarea>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label>Unidad de Medida *</label>
-                                <select id="product-unit" class="form-control" required>
-                                    <option value="UNIDAD">Unidad</option>
-                                    <option value="KILOGRAMO">Kilogramo</option>
-                                    <option value="GRAMO">Gramo</option>
-                                    <option value="LIBRA">Libra</option>
-                                    <option value="ONZA">Onza</option>
-                                    <option value="LITRO">Litro</option>
-                                    <option value="MILILITRO">Mililitro</option>
-                                    <option value="GALON">Galón</option>
-                                    <option value="CAJA">Caja</option>
-                                    <option value="POMO">Pomo</option>
-                                    <option value="PAR">Par</option>
-                                    <option value="METRO">Metro</option>
-                                    <option value="CENTIMETRO">Centímetro</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label>Costo Unitario *</label>
-                                <input type="number" id="product-unit-cost" class="form-control" min="0" step="0.01" required>
-                            </div>
+                    <div class="form-group">
+                        <label>Unidad de Medida *</label>
+                        <div class="d-flex align-items-center gap-2">
+                            <select id="product-unit" class="form-control" required>
+                                <option value="UNIDAD">Unidad</option>
+                                <option value="KILOGRAMO">Kilogramo</option>
+                                <option value="GRAMO">Gramo</option>
+                                <option value="LIBRA">Libra</option>
+                                <option value="ONZA">Onza</option>
+                                <option value="LITRO">Litro</option>
+                                <option value="MILILITRO">Mililitro</option>
+                                <option value="GALON">Galón</option>
+                                <option value="CAJA">Caja</option>
+                                <option value="POMO">Pomo</option>
+                                <option value="PAR">Par</option>
+                                <option value="METRO">Metro</option>
+                                <option value="CENTIMETRO">Centímetro</option>
+                                <option value="__ADD_NEW_UNIT__">+ Agregar nueva unidad</option>
+                            </select>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="openUnitManager('product-unit')">
+                                Gestionar
+                            </button>
                         </div>
                     </div>
                     <div class="row">
@@ -677,18 +1026,19 @@ button<!DOCTYPE html>
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+                <button class="btn btn-secondary" onclick="closeModal('product-modal')">Cancelar</button>
                 <button class="btn btn-primary" onclick="saveProduct()">Guardar</button>
             </div>
         </div>
 
         <!-- Movement Modal -->
-        <div id="movement-modal" class="modal wide-modal">
+        <div id="movement-modal" class="modal wide-modal movement-form-modal">
             <div class="modal-header">
                 <h3 id="movement-modal-title">Nuevo Movimiento</h3>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <button class="modal-close" onclick="closeModal('movement-modal')">&times;</button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body movement-form-modal-body">
+                <div class="movement-form-scroll" id="movement-form-scroll">
                 <form id="movement-form">
                     <input type="hidden" id="movement-type">
                     <div class="row">
@@ -719,7 +1069,13 @@ button<!DOCTYPE html>
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label>Tasa (1 USD = X moneda)</label>
-                                <input type="text" id="movement-currency-rate" class="form-control" readonly>
+                                <div class="d-flex align-items-center gap-2">
+                                    <input type="number" id="movement-currency-rate" class="form-control" min="0.000001" step="0.000001">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="resetMovementRateToDefault()">
+                                        Restablecer
+                                    </button>
+                                </div>
+                                <small class="text-muted">Edita la tasa para este movimiento sin salir del formulario.</small>
                             </div>
                         </div>
                     </div>
@@ -742,14 +1098,37 @@ button<!DOCTYPE html>
                         </div>
                     </div>
 
-                    <div class="section-header">
-                        <h4>Detalles del Movimiento</h4>
-                        <button type="button" class="btn btn-sm btn-primary" onclick="addMovementDetail()">
-                            <i class="fas fa-plus"></i> Agregar Producto
-                        </button>
+                    <div id="movement-counterpart-section" style="display: none;">
+                        <div class="form-group">
+                            <label>Cuenta de Contrapartida *</label>
+                            <select id="movement-counterpart" class="form-control" required>
+                                <option value="">Seleccionar cuenta</option>
+                            </select>
+                            <small class="text-muted" id="movement-counterpart-hint">
+                                Cuenta contable que recibe el efecto de este movimiento.
+                            </small>
+                        </div>
                     </div>
 
-                    <div class="table-responsive">
+                    <div class="movement-details-toolbar" id="movement-details-toolbar">
+                        <h4 class="movement-details-title">Detalles del movimiento</h4>
+                        <div class="movement-details-toolbar-actions">
+                            <button type="button" class="btn btn-secondary btn-icon-only"
+                                    id="movement-btn-create-product"
+                                    onclick="showQuickProductModal()"
+                                    title="Crear producto" aria-label="Crear producto">
+                                <i class="fas fa-box-open"></i>
+                            </button>
+                            <button type="button" class="btn btn-primary btn-icon-only"
+                                    id="movement-btn-add-product"
+                                    onclick="addMovementDetail()"
+                                    title="Agregar producto" aria-label="Agregar producto">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive movement-details-table-wrap">
                         <table class="table" id="movement-details-table">
                             <thead>
                                 <tr>
@@ -773,10 +1152,59 @@ button<!DOCTYPE html>
                         </table>
                     </div>
                 </form>
+                </div>
+            </div>
+            <div class="modal-footer movement-form-modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('movement-modal')">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="movement-btn-save" onclick="saveMovement()">
+                    <i class="fas fa-save"></i> Guardar movimiento
+                </button>
+            </div>
+        </div>
+
+        <!-- Admin Password Override Modal -->
+        <div id="admin-password-modal" class="modal">
+            <div class="modal-header">
+                <h3>Validación de administrador</h3>
+                <button class="modal-close" onclick="closeModal('admin-password-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="admin-password-hint" class="text-muted">Para forzar esta salida se requiere la contraseña de un administrador.</p>
+                <div class="form-group">
+                    <label for="admin-password-input">Contraseña de administrador *</label>
+                    <input type="password" id="admin-password-input" class="form-control" autocomplete="current-password" />
+                </div>
+                <p id="admin-password-error" class="text-danger small" style="margin-top: 0.5rem;"></p>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-                <button class="btn btn-primary" onclick="saveMovement()">Guardar Movimiento</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('admin-password-modal')">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="confirmAdminPasswordOverride()">Validar y guardar</button>
+            </div>
+        </div>
+
+        <!-- Movement Detail Modal (ver movimiento) -->
+        <div id="movement-detail-modal" class="modal movement-detail-modal">
+            <div class="modal-header movement-detail-header">
+                <div class="movement-detail-header-main">
+                    <span id="movement-detail-type-badge" class="status-badge">—</span>
+                    <div>
+                        <h3 id="movement-detail-title">Detalle del movimiento</h3>
+                        <p id="movement-detail-subtitle" class="movement-detail-subtitle"></p>
+                    </div>
+                </div>
+                <button type="button" class="modal-close" onclick="closeModal('movement-detail-modal')" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body" id="movement-detail-body">
+                <div class="movement-detail-loading text-center">
+                    <div class="spinner"></div>
+                    <p class="text-muted">Cargando información…</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('movement-detail-modal')">Cerrar</button>
+                <button type="button" class="btn btn-primary" id="movement-detail-print-btn">
+                    <i class="fas fa-print"></i> Imprimir comprobante
+                </button>
             </div>
         </div>
 
@@ -784,7 +1212,7 @@ button<!DOCTYPE html>
         <div id="client-modal" class="modal">
             <div class="modal-header">
                 <h3 id="client-modal-title">Nuevo Cliente</h3>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <button class="modal-close" onclick="closeModal('client-modal')">&times;</button>
             </div>
             <div class="modal-body">
                 <form id="client-form">
@@ -821,8 +1249,31 @@ button<!DOCTYPE html>
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+                <button class="btn btn-secondary" onclick="closeModal('client-modal')">Cancelar</button>
                 <button class="btn btn-primary" onclick="saveClient()">Guardar</button>
+            </div>
+        </div>
+
+        <!-- Client Detail Modal -->
+        <div id="client-detail-modal" class="modal movement-detail-modal">
+            <div class="modal-header movement-detail-header">
+                <div class="movement-detail-header-main">
+                    <span id="client-detail-status-badge" class="status-badge status-none">Cliente</span>
+                    <div>
+                        <h3 id="client-detail-title">Detalle del cliente</h3>
+                        <p id="client-detail-subtitle" class="movement-detail-subtitle"></p>
+                    </div>
+                </div>
+                <button type="button" class="modal-close" onclick="closeModal('client-detail-modal')" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body" id="client-detail-body">
+                <div class="movement-detail-loading text-center">
+                    <div class="spinner"></div>
+                    <p class="text-muted">Cargando información…</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('client-detail-modal')">Cerrar</button>
             </div>
         </div>
 
@@ -830,7 +1281,7 @@ button<!DOCTYPE html>
         <div id="cost-center-modal" class="modal">
             <div class="modal-header">
                 <h3 id="cost-center-modal-title">Nuevo Centro de Costo</h3>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <button class="modal-close" onclick="closeModal('cost-center-modal')">&times;</button>
             </div>
             <div class="modal-body">
                 <form id="cost-center-form">
@@ -855,8 +1306,31 @@ button<!DOCTYPE html>
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+                <button class="btn btn-secondary" onclick="closeModal('cost-center-modal')">Cancelar</button>
                 <button class="btn btn-primary" onclick="saveCostCenter()">Guardar</button>
+            </div>
+        </div>
+
+        <!-- Cost Center Detail Modal -->
+        <div id="cost-center-detail-modal" class="modal movement-detail-modal">
+            <div class="modal-header movement-detail-header">
+                <div class="movement-detail-header-main">
+                    <span id="cost-center-detail-status-badge" class="status-badge status-none">Centro</span>
+                    <div>
+                        <h3 id="cost-center-detail-title">Detalle del centro de costo</h3>
+                        <p id="cost-center-detail-subtitle" class="movement-detail-subtitle"></p>
+                    </div>
+                </div>
+                <button type="button" class="modal-close" onclick="closeModal('cost-center-detail-modal')" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body" id="cost-center-detail-body">
+                <div class="movement-detail-loading text-center">
+                    <div class="spinner"></div>
+                    <p class="text-muted">Cargando información…</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('cost-center-detail-modal')">Cerrar</button>
             </div>
         </div>
 
@@ -864,13 +1338,13 @@ button<!DOCTYPE html>
         <div id="product-selection-modal" class="modal">
             <div class="modal-header">
                 <h3>Seleccionar Producto</h3>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <button class="modal-close" onclick="closeModal('product-selection-modal')">&times;</button>
             </div>
             <div class="modal-body">
                 <input type="text" id="product-search-modal" class="form-control" 
                        placeholder="Buscar producto..." onkeyup="searchProductsModal()">
-                <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
-                    <table class="table" id="products-selection-table">
+                <div class="table-responsive table-report-scroll" style="max-height: min(55vh, 360px); overflow-y: auto;">
+                    <table class="table table-adaptive" id="products-selection-table">
                         <thead>
                             <tr>
                                 <th>Código</th>
@@ -887,17 +1361,331 @@ button<!DOCTYPE html>
                 </div>
             </div>
         </div>
+
+        <!-- Quick Product Modal (from Movements) -->
+        <div id="quick-product-modal" class="modal">
+            <div class="modal-header">
+                <h3>Crear Producto Rápido</h3>
+                <button class="modal-close" onclick="closeQuickProductModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="quick-product-form">
+                    <div class="form-group">
+                        <label>Código *</label>
+                        <input type="text" id="quick-product-code" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Nombre *</label>
+                        <input type="text" id="quick-product-name" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Descripción</label>
+                        <textarea id="quick-product-description" class="form-control" rows="2"></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Unidad *</label>
+                                <div class="d-flex align-items-center gap-2">
+                                    <select id="quick-product-unit" class="form-control" required>
+                                        <option value="UNIDAD">Unidad</option>
+                                        <option value="KILOGRAMO">Kilogramo</option>
+                                        <option value="GRAMO">Gramo</option>
+                                        <option value="LIBRA">Libra</option>
+                                        <option value="ONZA">Onza</option>
+                                        <option value="LITRO">Litro</option>
+                                        <option value="MILILITRO">Mililitro</option>
+                                        <option value="GALON">Galón</option>
+                                        <option value="CAJA">Caja</option>
+                                        <option value="POMO">Pomo</option>
+                                        <option value="PAR">Par</option>
+                                        <option value="METRO">Metro</option>
+                                        <option value="CENTIMETRO">Centímetro</option>
+                                        <option value="__ADD_NEW_UNIT__">+ Agregar nueva unidad</option>
+                                    </select>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="openUnitManager('quick-product-unit')">
+                                        Gestionar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Stock Mínimo *</label>
+                                <input type="number" id="quick-product-min-stock" class="form-control" min="0" step="0.01" value="0" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Stock Máximo</label>
+                        <input type="number" id="quick-product-max-stock" class="form-control" min="0" step="0.01">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeQuickProductModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveQuickProductFromMovement()">Crear y Agregar</button>
+            </div>
+        </div>
+
+        <!-- Unit Manager Modal -->
+        <div id="unit-manager-modal" class="modal">
+            <div class="modal-header">
+                <h3>Unidades de medida</h3>
+                <button class="modal-close" onclick="closeModal('unit-manager-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">Agrega nuevas unidades o elimina las personalizadas que ya no necesites.</p>
+                <div id="unit-manager-list" class="unit-manager-list"></div>
+                <div class="mt-3">
+                    <button class="btn btn-primary btn-sm" type="button" onclick="addCustomUnitViaManager()">
+                        + Añadir unidad
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">Cerrar</button>
+            </div>
+        </div>
+
+        <div id="user-modal" class="modal">
+            <div class="modal-header">
+                <h3 id="user-modal-title">Nuevo Usuario</h3>
+                <button class="modal-close" onclick="closeUserModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="user-form">
+                    <input type="hidden" id="user-id">
+                    <div class="form-group">
+                        <label>Nombre *</label>
+                        <input type="text" id="user-name-input" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email *</label>
+                        <input type="email" id="user-email-input" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Rol *</label>
+                        <select id="user-role-input" class="form-control" required>
+                            <option value="USER">USER</option>
+                            <option value="ADMIN">ADMIN</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Contraseña <span id="user-password-required">*</span></label>
+                        <input type="password" id="user-password-input" class="form-control" minlength="6">
+                        <small class="text-muted">En edición, deje vacío para no cambiar la contraseña.</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeUserModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveUser()">Guardar</button>
+            </div>
+        </div>
+
+        <!-- Account Modal -->
+        <div id="account-modal" class="modal">
+            <div class="modal-header">
+                <h3 id="account-modal-title">Nueva Cuenta</h3>
+                <button class="modal-close" onclick="closeAccountModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="account-form">
+                    <input type="hidden" id="account-id">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Código *</label>
+                                <input type="text" id="account-code" class="form-control" maxlength="32" required>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="form-group">
+                                <label>Nombre *</label>
+                                <input type="text" id="account-name" class="form-control" maxlength="160" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Tipo *</label>
+                                <select id="account-type" class="form-control" required>
+                                    <option value="ASSET">Activo</option>
+                                    <option value="LIABILITY">Pasivo</option>
+                                    <option value="EQUITY">Patrimonio</option>
+                                    <option value="REVENUE">Ingresos</option>
+                                    <option value="EXPENSE">Gastos</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="form-group">
+                                <label>Cuenta padre (opcional)</label>
+                                <select id="account-parent" class="form-control">
+                                    <option value="">Sin cuenta padre</option>
+                                </select>
+                                <small class="text-muted">Solo se muestran cuentas del mismo tipo.</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Descripción</label>
+                        <textarea id="account-description" class="form-control" rows="2" maxlength="500"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label><input type="checkbox" id="account-active" checked> Cuenta activa</label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeAccountModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveAccount()">Guardar</button>
+            </div>
+        </div>
+
+        <!-- Period Modal -->
+        <div id="period-modal" class="modal">
+            <div class="modal-header">
+                <h3>Nuevo Período Contable</h3>
+                <button class="modal-close" onclick="closeModal('period-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="period-form">
+                    <div class="form-group">
+                        <label>Nombre *</label>
+                        <input type="text" id="period-name" class="form-control" maxlength="80" placeholder="Ej. 2026-01" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Fecha inicial *</label>
+                                <input type="date" id="period-start" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Fecha final *</label>
+                                <input type="date" id="period-end" class="form-control" required>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('period-modal')">Cancelar</button>
+                <button class="btn btn-primary" onclick="savePeriod()">Guardar</button>
+            </div>
+        </div>
+
+        <!-- Journal Entry Modal -->
+        <div id="journal-entry-modal" class="modal wide-modal">
+            <div class="modal-header">
+                <h3 id="journal-entry-modal-title">Nuevo Asiento Contable</h3>
+                <button class="modal-close" onclick="closeJournalEntryModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="journal-entry-form">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>Fecha *</label>
+                                <input type="date" id="journal-entry-date" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>Referencia</label>
+                                <input type="text" id="journal-entry-reference" class="form-control" maxlength="120">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Tipo de asiento</label>
+                                <select id="journal-entry-kind" class="form-control">
+                                    <option value="GENERAL">General</option>
+                                    <option value="INVENTORY_OPENING">Apertura de inventario</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Descripción *</label>
+                        <textarea id="journal-entry-description" class="form-control" rows="2" maxlength="500" required></textarea>
+                    </div>
+
+                    <div class="movement-details-toolbar">
+                        <h4 class="movement-details-title">Partidas (débito / crédito)</h4>
+                        <div class="movement-details-toolbar-actions">
+                            <button type="button" class="btn btn-primary btn-sm" onclick="addJournalLine()">
+                                <i class="fas fa-plus"></i> Añadir línea
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table" id="journal-lines-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 23%;">Cuenta *</th>
+                                    <th style="width: 18%;">Centro de costo</th>
+                                    <th style="width: 21%;">Descripción</th>
+                                    <th style="width: 13%;">Débito</th>
+                                    <th style="width: 13%;">Crédito</th>
+                                    <th style="width: 12%;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="journal-lines-body"></tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="3" class="text-right"><strong>Totales:</strong></td>
+                                    <td><strong id="journal-total-debit">0.00</strong></td>
+                                    <td><strong id="journal-total-credit">0.00</strong></td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <p class="text-muted" id="journal-balance-hint">Las partidas deben estar balanceadas (débito = crédito).</p>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeJournalEntryModal()">Cancelar</button>
+                <button class="btn btn-primary" id="journal-entry-save-btn" onclick="saveJournalEntry()">
+                    <i class="fas fa-save"></i> Guardar borrador
+                </button>
+            </div>
+        </div>
+
+        <!-- Journal Entry Detail Modal -->
+        <div id="journal-entry-detail-modal" class="modal wide-modal">
+            <div class="modal-header">
+                <h3 id="journal-detail-title">Detalle del Asiento</h3>
+                <button class="modal-close" onclick="closeModal('journal-entry-detail-modal')">&times;</button>
+            </div>
+            <div class="modal-body" id="journal-detail-content"></div>
+            <div class="modal-footer">
+                <div id="journal-detail-actions" class="d-flex gap-2"></div>
+                <button class="btn btn-secondary" onclick="closeModal('journal-entry-detail-modal')">Cerrar</button>
+            </div>
+        </div>
     </div>
 
     <!-- Scripts -->
     <script src="js/utils.js"></script>
     <script src="js/auth.js"></script>
+    <script src="js/listItems.js"></script>
     <script src="js/products.js"></script>
     <script src="js/movements.js"></script>
     <script src="js/clients.js"></script>
     <script src="js/costCenters.js"></script>
     <script src="js/reports.js"></script>
     <script src="js/company.js"></script>
+    <script src="js/users.js"></script>
+    <script src="js/accounting.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>
+
+

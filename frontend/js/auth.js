@@ -31,7 +31,11 @@ async function register(name, email, password) {
         
         return true;
     } catch (error) {
-        showAlert(error.message || 'Error al registrar usuario', 'error');
+        if ((error.message || '').includes('403')) {
+            showAlert('Solo un administrador puede crear usuarios', 'warning');
+        } else {
+            showAlert(error.message || 'Error al registrar usuario', 'error');
+        }
         return false;
     }
 }
@@ -66,6 +70,11 @@ function showMainApp() {
     const user = getCurrentUser();
     if (user) {
         document.getElementById('user-name').textContent = user.name;
+    }
+
+    const companyLink = document.querySelector('.nav-link[data-section="company"]');
+    if (companyLink) {
+        companyLink.style.display = isAdmin() ? '' : 'none';
     }
 }
 

@@ -2,6 +2,10 @@ let costCenters = [];
 let currentCostCenterPage = 1;
 let totalCostCenterPages = 1;
 
+function generateAutoCode(prefix) {
+    return `${prefix}${Date.now().toString().slice(-8)}`;
+}
+
 // Cargar centros de costo
 async function loadCostCenters(page = 1, search = '') {
     try {
@@ -40,34 +44,43 @@ function renderCostCentersTable() {
         return;
     }
     
+    const compact = typeof isCompactListView === 'function' && isCompactListView();
+
     costCenters.forEach(center => {
         const row = document.createElement('tr');
-        
-        row.innerHTML = `
-            <td>${center.code}</td>
-            <td>
-                <strong>${center.name}</strong>
-                ${center.description ? `<br><small>${center.description}</small>` : ''}
-            </td>
-            <td>${center.description || '-'}</td>
-            <td>
-                <span class="status-badge ${center.isActive ? 'status-active' : 'status-inactive'}">
-                    ${center.isActive ? 'Activo' : 'Inactivo'}
-                </span>
-            </td>
-            <td class="actions">
-                <button class="btn btn-sm btn-outline" onclick="editCostCenter(${center.id})" title="Editar">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn btn-sm btn-outline" onclick="deleteCostCenter(${center.id})" title="Eliminar">
-                    <i class="fas fa-trash"></i>
-                </button>
-                <button class="btn btn-sm btn-outline" onclick="viewCostCenterMovements(${center.id})" title="Movimientos">
-                    <i class="fas fa-exchange-alt"></i>
-                </button>
-            </td>
-        `;
-        
+        const canDelete = isAdmin();
+
+        if (compact) {
+            row.className = 'table-compact-row';
+            row.innerHTML = `<td colspan="5" class="table-compact-cell">${buildCostCenterListItemHtml(center, { canDelete })}</td>`;
+        } else {
+            row.innerHTML = `
+                <td class="cell-compact">${center.code}</td>
+                <td class="cell-text">
+                    <strong>${center.name}</strong>
+                    ${center.description ? `<small>${center.description}</small>` : ''}
+                </td>
+                <td class="cell-text">${center.description || '-'}</td>
+                <td class="cell-compact">
+                    <span class="status-badge ${center.isActive ? 'status-active' : 'status-inactive'}">
+                        ${center.isActive ? 'Activo' : 'Inactivo'}
+                    </span>
+                </td>
+                <td class="actions">
+                    <button class="btn btn-sm btn-outline" onclick="editCostCenter(${center.id})" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    ${canDelete ? `
+                    <button class="btn btn-sm btn-outline" onclick="deleteCostCenter(${center.id})" title="Eliminar">
+                        <i class="fas fa-trash"></i>
+                    </button>` : ''}
+                    <button class="btn btn-sm btn-outline" onclick="viewCostCenterMovements(${center.id})" title="Movimientos">
+                        <i class="fas fa-exchange-alt"></i>
+                    </button>
+                </td>
+            `;
+        }
+
         tbody.appendChild(row);
     });
 }
@@ -83,6 +96,7 @@ function showAddCostCenterModal() {
     resetForm('cost-center-form');
     document.getElementById('cost-center-modal-title').textContent = 'Nuevo Centro de Costo';
     document.getElementById('cost-center-id').value = '';
+    document.getElementById('cost-center-code').value = generateAutoCode('CC-');
     showModal('cost-center-modal');
 }
 
@@ -169,10 +183,71 @@ async function viewCostCenterMovements(id) {
     try {
         const center = await apiRequest(`/cost-centers/${id}`);
         const movements = await apiRequest(`/cost-centers/${id}/movements`);
-        
-        // Implementar vista de movimientos del centro de costo
-        alert(`Movimientos del centro de costo: ${center.name}\nTotal: ${movements.length} movimientos`);
-        
+        const bodyEl = document.getElementById('cost-center-detail-body');
+        const titleEl = document.getElementById('cost-center-detail-title');
+        const subtitleEl = document.getElementById('cost-center-detail-subtitle');
+        const badgeEl = document.getElementById('cost-center-detail-status-badge');
+
+        if (titleEl) {
+            titleEl.textContent = `Centro de costo: ${center.name || center.code || '—'}`;
+        }
+        if (subtitleEl) {
+            subtitleEl.textContent = `Código: ${center.code || '—'}`;
+        }
+        if (badgeEl) {
+            badgeEl.textContent = center.isActive ? 'Activo' : 'Inactivo';
+            badgeEl.className = `status-badge ${center.isActive ? 'status-active' : 'status-inactive'}`;
+        }
+
+        if (bodyEl) {
+            const movementRows = movements.length
+                ? movements.slice(0, 8).map(movement => {
+                    const totalAmount = (movement.details || []).reduce(
+                        (sum, detail) => sum + Number(detail.totalCost || 0),
+                        0,
+                    );
+                    return `
+                        <tr>
+                            <td class="cell-compact">${escapeHtml(movement.documentNumber || movement.id || '')}</td>
+                            <td class="cell-text">${escapeHtml(formatDate(movement.date))}</td>
+                            <td class="cell-text">${escapeHtml(movement.type === 'ENTRADA' ? 'Entrada' : 'Salida')}</td>
+                            <td class="cell-currency text-right">${formatCurrency(totalAmount, movement.currencyCode || 'USD')}</td>
+                            <td class="cell-text">${escapeHtml(movement.user?.name || '—')}</td>
+                        </tr>
+                    `;
+                }).join('')
+                : '';
+
+            bodyEl.innerHTML = `
+                <div class="movement-detail-meta">
+                    <div class="movement-detail-meta-item">
+                        <label>Descripción</label>
+                        <span>${escapeHtml(center.description || '—')}</span>
+                    </div>
+                </div>
+                <h4 class="movement-detail-section-title">
+                    <i class="fas fa-history"></i> Movimientos recientes (${movements.length})
+                </h4>
+                <div class="table-responsive movement-detail-products">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Documento</th>
+                                <th>Fecha</th>
+                                <th>Tipo</th>
+                                <th class="text-right">Total</th>
+                                <th>Usuario</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${movementRows || `<tr><td colspan="5" class="text-center movement-detail-empty">No hay movimientos registrados</td></tr>`}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        showModal('cost-center-detail-modal');
     } catch (error) {
         showAlert('Error al cargar los movimientos del centro de costo', 'error');
     }

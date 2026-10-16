@@ -3,6 +3,7 @@ import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { JwtAuthGuard } from '../shared/guards/jwt-auth.guard';
+import { AdminRoleGuard } from '../shared/guards/admin-role.guard';
 
 @Controller('products')
 @UseGuards(JwtAuthGuard)
@@ -32,6 +33,11 @@ export class ProductsController {
     return this.productsService.getLowStockProducts();
   }
 
+  @Get('next-code')
+  getNextCode() {
+    return this.productsService.getNextCode();
+  }
+
   @Get(':id/cost-options')
   getCostOptions(@Param('id') id: string) {
     return this.productsService.getCostOptions(+id);
@@ -53,6 +59,7 @@ export class ProductsController {
   }
 
   @Delete(':id')
+  @UseGuards(AdminRoleGuard)
   remove(@Param('id') id: string) {
     return this.productsService.remove(+id);
   }

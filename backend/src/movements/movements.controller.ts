@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Param, Query, UseGuards, Request, BadReque
 import { MovementsService } from './movements.service';
 import { CreateMovementDto } from './dto/create-movement.dto';
 import { JwtAuthGuard } from '../shared/guards/jwt-auth.guard';
+import { AdminRoleGuard } from '../shared/guards/admin-role.guard';
 
 @Controller('movements')
 @UseGuards(JwtAuthGuard)
@@ -47,6 +48,9 @@ export class MovementsController {
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
     @Query('currency') currency?: string,
+    @Query('type') type?: string,
+    @Query('clientId') clientId?: string,
+    @Query('costCenterId') costCenterId?: string,
   ) {
     if (!startDate || !endDate) {
       throw new BadRequestException('startDate and endDate are required');
@@ -58,12 +62,25 @@ export class MovementsController {
     // Asegurar que el 'end' incluya todo el día (hasta 23:59:59.999)
     end.setHours(23, 59, 59, 999);
 
-    return this.movementsService.getMovementsReport(start, end, currency || 'USD');
+    return this.movementsService.getMovementsReport(
+      start,
+      end,
+      currency || 'USD',
+      type as any,
+      clientId ? parseInt(clientId) : undefined,
+      costCenterId ? parseInt(costCenterId) : undefined,
+    );
   }
 
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.movementsService.findOne(+id);
+  }
+
+  @Post(':id/reverse')
+  @UseGuards(AdminRoleGuard)
+  reverse(@Param('id') id: string, @Request() req) {
+    return this.movementsService.reverse(+id, req.user.userId);
   }
 
   @Get(':id/voucher')

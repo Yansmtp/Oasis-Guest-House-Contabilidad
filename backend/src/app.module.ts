@@ -1,8 +1,6 @@
 // backend/src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { join } from 'path';
-import { ServeStaticModule } from '@nestjs/serve-static';
 
 import { SharedModule } from './shared/shared.module';
 import { AuthModule } from './auth/auth.module';
@@ -14,15 +12,12 @@ import { ReportsModule } from './reports/reports.module';
 import { CompanyModule } from './company/company.module';
 import { CurrenciesModule } from './currencies/currencies.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
+import { UsersModule } from './users/users.module';
+import { AccountingModule } from './accounting/accounting.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-
-    ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', '..', '..', 'frontend'), // 3 niveles arriba hasta inventario-casa-renta
-      exclude: ['/api*'],
-    }),
 
     SharedModule,     // contiene PrismaModule
     AuthModule,
@@ -35,6 +30,8 @@ import { MaintenanceModule } from './maintenance/maintenance.module';
     // Currencies (file-based simple settings)
     CurrenciesModule,
     MaintenanceModule,
+    UsersModule,
+    AccountingModule,
   ],
 })
 export class AppModule {}

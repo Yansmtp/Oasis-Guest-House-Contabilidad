@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, Min, IsUrl } from 'class-validator';
+import { IsString, IsOptional, IsNumber, Min, IsUrl, Length, Matches } from 'class-validator';
 
 export class UpdateCompanyDto {
   @IsString()
@@ -24,6 +24,12 @@ export class UpdateCompanyDto {
   @IsUrl()
   @IsOptional()
   website?: string;
+
+  @IsString()
+  @Length(3, 3)
+  @Matches(/^[A-Za-z]{3}$/)
+  @IsOptional()
+  functionalCurrencyCode?: string;
 
   @IsNumber()
   @Min(0)

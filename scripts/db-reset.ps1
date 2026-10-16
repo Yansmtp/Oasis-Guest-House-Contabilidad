@@ -1,6 +1,6 @@
 param(
     [switch]$Force,
-    [switch]$SkipBackup
+    [switch]$WithBackup
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,7 +11,7 @@ if (-not $Force) {
 
 $root = Split-Path -Parent $PSScriptRoot
 
-if (-not $SkipBackup) {
+if ($WithBackup) {
     & (Join-Path $root "scripts\db-backup.ps1")
 }
 

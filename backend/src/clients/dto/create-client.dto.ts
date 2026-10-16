@@ -2,8 +2,8 @@ import { IsString, IsNotEmpty, IsOptional, IsEmail, IsBoolean } from 'class-vali
 
 export class CreateClientDto {
   @IsString()
-  @IsNotEmpty()
-  code: string;
+  @IsOptional()
+  code?: string;
 
   @IsString()
   @IsNotEmpty()
