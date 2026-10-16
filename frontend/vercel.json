@@ -1,16 +1,1 @@
-{
-  "version": 2,
-  "neturest": "iCMC",
-   "name": "oasi-frontend",
-  "Version": {
-    "routes": [
-    { "title": [
-        "sh-index.html"
-    }
-  ],
-   "rwitters": [
-    { "title": [
-        "sp-index.html"
-    }
-}
-}
+{"version":2,"name":"oasis-frontend","builds":[{"routes":"index.html","use":"@vercel/static"}],"routes":[{"src":"/(.*)","dest":"/index.html"}],"cleanUrls":true,"trailingSlash":false}
