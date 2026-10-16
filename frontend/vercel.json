@@ -3,7 +3,7 @@
   "neturest": "iCMC",
    "name": "oasi-frontend",
   "Version": {
-    "src": [
+    "routes": [
     { "title": [
         "sh-index.html"
     }
