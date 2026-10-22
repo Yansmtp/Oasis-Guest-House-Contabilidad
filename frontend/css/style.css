@@ -2682,6 +2682,28 @@ a { color: var(--primary-color); }
 .accounting-tab:hover { box-shadow: none; }
 .accounting-tab.active { color: #fff; background: var(--primary-color); box-shadow: none; }
 
+/* La fila contable usa col-md-3 sin una definición Bootstrap asociada. */
+.accounting-filters {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(150px, 190px)) minmax(110px, 140px);
+    align-items: end;
+    gap: 12px;
+    margin: 0 0 20px;
+}
+
+.accounting-filters > [class*="col-md-"] {
+    width: auto;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+}
+
+.accounting-filters .form-group { margin: 0; }
+.accounting-filters > .d-flex { align-items: flex-end; }
+.accounting-filters .btn-block { width: 100%; min-height: 40px; height: auto; }
+
+.gap-3 { gap: 1rem; }
+
 :focus-visible {
     outline: 3px solid rgba(23, 105, 224, 0.35);
     outline-offset: 2px;
@@ -2702,6 +2724,7 @@ a { color: var(--primary-color); }
     .card-body { padding: 16px; }
     .stats-grid { gap: 10px; }
     .stat-card { padding: 14px; }
+    .accounting-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 576px) {
@@ -2712,6 +2735,7 @@ a { color: var(--primary-color); }
     .section-header > .btn,
     .section-header-actions .btn { width: 100%; }
     .login-container { margin: 28px auto; padding: 22px; }
+    .accounting-filters { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
