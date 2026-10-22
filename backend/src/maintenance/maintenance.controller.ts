@@ -19,8 +19,8 @@ export class MaintenanceController {
   }
 
   @Post('restore')
-  restore(@Body() body: { backupDir?: string }) {
-    return this.maintenanceService.restore(body?.backupDir || '');
+  restore(@Body() body: { backupPath?: string; backupDir?: string }) {
+    return this.maintenanceService.restore(body?.backupPath || body?.backupDir || '');
   }
 
   @Post('reset')

@@ -1,19 +1,21 @@
 import {
   Injectable,
+  ForbiddenException,
   InternalServerErrorException,
   Logger,
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
 import { execFile } from 'child_process';
-import { existsSync, mkdirSync } from 'fs';
-import { homedir } from 'os';
-import { isAbsolute, join } from 'path';
+import { existsSync, mkdirSync, statSync } from 'fs';
+import { isAbsolute, join, resolve } from 'path';
+import { resolveUploadsRoot } from '../shared/utils/uploads-root';
 
 @Injectable()
 export class MaintenanceService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MaintenanceService.name);
   private autoBackupTimer: NodeJS.Timeout | null = null;
+  private autoBackupStartTimer: NodeJS.Timeout | null = null;
   private autoBackupEnabled = true;
   private autoBackupIntervalHours = 24;
 
@@ -23,7 +25,7 @@ export class MaintenanceService implements OnModuleInit, OnModuleDestroy {
   }
 
   private getDefaultBackupDir() {
-    return process.env.MAINTENANCE_BACKUP_DIR || join(homedir(), 'InventoryBackups');
+    return process.env.MAINTENANCE_BACKUP_DIR || join(resolveUploadsRoot(), 'backups');
   }
 
   private ensureBackupDir(dir: string) {
@@ -33,13 +35,12 @@ export class MaintenanceService implements OnModuleInit, OnModuleDestroy {
   }
 
   private resolveBackupDir(dir?: string) {
-    const root = this.getRepoRoot();
     const target = (dir || '').trim() || this.getDefaultBackupDir();
-    return isAbsolute(target) ? target : join(root, target);
+    return isAbsolute(target) ? target : resolve(target);
   }
 
   async onModuleInit() {
-    this.autoBackupEnabled = String(process.env.MAINTENANCE_AUTO_BACKUP ?? 'true').toLowerCase() !== 'false';
+    this.autoBackupEnabled = String(process.env.MAINTENANCE_AUTO_BACKUP ?? 'false').toLowerCase() === 'true';
     const parsedHours = Number(process.env.MAINTENANCE_AUTO_BACKUP_HOURS ?? '24');
     this.autoBackupIntervalHours = Number.isFinite(parsedHours) && parsedHours > 0 ? parsedHours : 24;
 
@@ -49,7 +50,7 @@ export class MaintenanceService implements OnModuleInit, OnModuleDestroy {
     if (!this.autoBackupEnabled) return;
 
     const intervalMs = this.autoBackupIntervalHours * 60 * 60 * 1000;
-    setTimeout(() => this.runAutoBackup(), 10000);
+    this.autoBackupStartTimer = setTimeout(() => this.runAutoBackup(), 10000);
     this.autoBackupTimer = setInterval(() => this.runAutoBackup(), intervalMs);
   }
 
@@ -57,6 +58,10 @@ export class MaintenanceService implements OnModuleInit, OnModuleDestroy {
     if (this.autoBackupTimer) {
       clearInterval(this.autoBackupTimer);
       this.autoBackupTimer = null;
+    }
+    if (this.autoBackupStartTimer) {
+      clearTimeout(this.autoBackupStartTimer);
+      this.autoBackupStartTimer = null;
     }
   }
 
@@ -77,15 +82,22 @@ export class MaintenanceService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private runPowerShell(scriptPath: string, args: string[] = []): Promise<string> {
+  private runPostgresTool(command: string, args: string[], databaseUrl: string): Promise<string> {
+    let password: string | undefined;
+    try {
+      password = decodeURIComponent(new URL(databaseUrl).password);
+    } catch {
+      throw new InternalServerErrorException('La URL de base de datos no tiene un formato válido');
+    }
     return new Promise((resolve, reject) => {
       execFile(
-        'powershell',
-        ['-ExecutionPolicy', 'Bypass', '-File', scriptPath, ...args],
-        { windowsHide: true },
+        command,
+        args,
+        { windowsHide: true, maxBuffer: 1024 * 1024, env: { ...process.env, PGPASSWORD: password } },
         (error, stdout, stderr) => {
           if (error) {
-            return reject(new InternalServerErrorException(stderr || error.message));
+            const detail = String(stderr || error.message).replace(/postgres(?:ql)?:\/\/\S+/gi, '[database-url]');
+            return reject(new InternalServerErrorException(detail));
           }
           resolve(stdout || '');
         },
@@ -93,15 +105,18 @@ export class MaintenanceService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private extractPathFromOutput(output: string, marker: string) {
-    const lines = String(output || '')
-      .split(/\r?\n/)
-      .map((l) => l.trim())
-      .filter(Boolean);
-    const found = lines.find((l) => l.toLowerCase().includes(marker.toLowerCase()));
-    if (!found) return null;
-    const parts = found.split(':');
-    return parts.length > 1 ? parts.slice(1).join(':').trim() : null;
+  private runPowerShell(scriptPath: string, args: string[] = []): Promise<string> {
+    return new Promise((resolve, reject) => {
+      execFile(
+        'powershell',
+        ['-ExecutionPolicy', 'Bypass', '-File', scriptPath, ...args],
+        { windowsHide: true, maxBuffer: 1024 * 1024 },
+        (error, stdout, stderr) => {
+          if (error) return reject(new InternalServerErrorException(stderr || error.message));
+          resolve(stdout || '');
+        },
+      );
+    });
   }
 
   getConfig() {
@@ -113,27 +128,36 @@ export class MaintenanceService implements OnModuleInit, OnModuleDestroy {
   }
 
   async backup(outputDir?: string, auto = false) {
-    const root = this.getRepoRoot();
-    const script = join(root, 'scripts', 'db-backup.ps1');
+    const databaseUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
+    if (!databaseUrl) throw new InternalServerErrorException('Falta configurar DATABASE_URL');
     const dir = this.resolveBackupDir(outputDir);
     this.ensureBackupDir(dir);
-    const output = await this.runPowerShell(script, ['-OutputDir', dir]);
-    const path = this.extractPathFromOutput(output, 'Backup completado en');
-    return { ok: true, output, path, auto };
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupPath = join(dir, `database-${stamp}.dump`);
+    const command = process.env.PG_DUMP_PATH || 'pg_dump';
+    const output = await this.runPostgresTool(command, [
+      '--format=custom', '--no-owner', '--no-acl', `--file=${backupPath}`, `--dbname=${databaseUrl}`,
+    ], databaseUrl);
+    return { ok: true, output, path: backupPath, auto };
   }
 
-  async restore(backupDir: string) {
-    if (!backupDir || !backupDir.trim()) {
-      throw new InternalServerErrorException('Debe indicar la carpeta del respaldo a restaurar');
+  async restore(backupPath: string) {
+    if (!backupPath || !backupPath.trim() || !existsSync(backupPath) || !statSync(backupPath).isFile()) {
+      throw new InternalServerErrorException('Debe indicar la ruta de un archivo de respaldo existente');
     }
-    const root = this.getRepoRoot();
-    const script = join(root, 'scripts', 'db-restore.ps1');
-    const output = await this.runPowerShell(script, ['-BackupDir', backupDir.trim()]);
-    const path = this.extractPathFromOutput(output, 'Restaur');
-    return { ok: true, output, path };
+    const databaseUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
+    if (!databaseUrl) throw new InternalServerErrorException('Falta configurar DATABASE_URL');
+    const command = process.env.PG_RESTORE_PATH || 'pg_restore';
+    const output = await this.runPostgresTool(command, [
+      '--clean', '--if-exists', '--no-owner', '--no-acl', `--dbname=${databaseUrl}`, backupPath.trim(),
+    ], databaseUrl);
+    return { ok: true, output, path: backupPath };
   }
 
   async reset() {
+    if (process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException('El reinicio destructivo está deshabilitado en producción');
+    }
     const root = this.getRepoRoot();
     const script = join(root, 'scripts', 'db-reset.ps1');
     const output = await this.runPowerShell(script, ['-Force']);

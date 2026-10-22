@@ -14,10 +14,25 @@ import { CurrenciesModule } from './currencies/currencies.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
 import { UsersModule } from './users/users.module';
 import { AccountingModule } from './accounting/accounting.module';
+import { HealthController } from './health.controller';
+import * as Joi from 'joi';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      validationSchema: Joi.object({
+        DATABASE_URL: Joi.string().required(),
+        JWT_SECRET: Joi.string().when('NODE_ENV', {
+          is: 'production', then: Joi.string().min(32).required(), otherwise: Joi.optional(),
+        }),
+        FRONTEND_URL: Joi.string().when('NODE_ENV', {
+          is: 'production', then: Joi.required(), otherwise: Joi.optional(),
+        }),
+        PORT: Joi.number().port().default(3000),
+      }),
+      validationOptions: { allowUnknown: true, abortEarly: false },
+    }),
 
     SharedModule,     // contiene PrismaModule
     AuthModule,
@@ -33,5 +48,6 @@ import { AccountingModule } from './accounting/accounting.module';
     UsersModule,
     AccountingModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}

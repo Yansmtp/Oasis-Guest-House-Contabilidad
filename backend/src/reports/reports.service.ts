@@ -6,7 +6,6 @@ import { CurrenciesService } from '../currencies/currencies.service';
 import { MovementStatus, Prisma, MovementType } from '@prisma/client';
 import * as ExcelJS from 'exceljs';
 import * as fs from 'fs/promises';
-import * as path from 'path';
 
 // Helper para convertir Decimal a number
 function toNum(value: Prisma.Decimal | number | string | null | undefined): number {
@@ -99,10 +98,6 @@ export class ReportsService {
     return sorted[lower] * (1 - weight) + sorted[upper] * weight;
   }
 
-  private async ensureDir(dirPath: string) {
-    await fs.mkdir(dirPath, { recursive: true });
-  }
-
   private async resolveExistingTemplatePath(candidates: string[]) {
     for (const candidate of candidates) {
       if (!candidate) continue;
@@ -118,28 +113,14 @@ export class ReportsService {
 
   private async nextInvoiceNumber(now: Date) {
     const year2 = String(now.getFullYear()).slice(-2);
-    const reportDir = path.resolve(process.cwd(), 'uploads', 'reports');
-    await this.ensureDir(reportDir);
-    const seqPath = path.join(reportDir, 'invoice-seq.json');
-
-    let seqData: any = { year2, seq: 0 };
-    try {
-      const raw = await fs.readFile(seqPath, 'utf8');
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object') {
-        seqData = parsed;
-      }
-    } catch (e) {
-      // si no existe, se crea mas abajo
-    }
-
-    if (seqData.year2 !== year2) {
-      seqData.year2 = year2;
-      seqData.seq = 0;
-    }
-    seqData.seq = Number(seqData.seq || 0) + 1;
-    await fs.writeFile(seqPath, JSON.stringify(seqData, null, 2), 'utf8');
-    return `FCT${year2}${String(seqData.seq).padStart(4, '0')}`;
+    const rows = await this.prisma.$queryRaw<Array<{ sequence: number }>>(Prisma.sql`
+      INSERT INTO "InvoiceSequence" ("year", "sequence")
+      VALUES (${now.getFullYear()}, 1)
+      ON CONFLICT ("year") DO UPDATE
+      SET "sequence" = "InvoiceSequence"."sequence" + 1
+      RETURNING "sequence"
+    `);
+    return `FCT${year2}${String(rows[0].sequence).padStart(4, '0')}`;
   }
 
   private async getMovementsReportData(params: MovementReportExportParams) {

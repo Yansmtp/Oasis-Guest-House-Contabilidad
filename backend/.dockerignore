@@ -1,0 +1,12 @@
+node_modules
+dist
+coverage
+.git
+.env
+.env.*
+uploads
+frontend-*.html
+frontend-*.txt
+vercel-*.json
+vercel-*.txt
+npm-debug.log*

@@ -59,9 +59,18 @@ async function bootstrap() {
     console.warn('crossOriginResourcePolicy no disponible en helmet:', e);
   }
 
+  const allowedOrigins = new Set(
+    configService.get('FRONTEND_URL', 'http://localhost:8080')
+      .split(',')
+      .map((origin: string) => origin.trim())
+      .filter(Boolean),
+  );
   app.enableCors({
-    origin: true,
-    credentials: true,
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+      return callback(new Error('Origin not allowed by CORS'));
+    },
+    credentials: false,
     // Incluir HEAD y PATCH para que las peticiones preflight permitan métodos PATCH
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     // Añadir cabeceras comunes que pueden enviarse en peticiones CORS
@@ -84,8 +93,6 @@ async function bootstrap() {
     // Permitir uso cross-origin de recursos estáticos (para <img>, <link>, etc.)
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     // También permitir CORS en caso de que el navegador lo requiera para ciertas solicitudes
-    res.setHeader('Access-Control-Allow-Origin', configService.get('FRONTEND_URL', 'http://localhost:8080'));
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
     next();
   });
 
@@ -97,8 +104,8 @@ async function bootstrap() {
   // Interceptor global: convierte rutas de 'logo' que empiezan con '/uploads' en URLs absolutas
   app.useGlobalInterceptors(new LogoUrlInterceptor());
 
-  const port = configService.get('PORT', 3000);
-  await app.listen(port);
+  const port = Number(configService.get('PORT', 3000));
+  await app.listen(port, '0.0.0.0');
   console.log(`🚀 Aplicación corriendo en: http://localhost:${port}`);
 }
 bootstrap();
