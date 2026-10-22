@@ -99,8 +99,11 @@ async function apiRequest(endpoint, options = {}) {
 
         if (!response.ok) {
             if (response.status === 401) {
+                if (endpoint === '/auth/login') {
+                    throw new Error('Correo o contraseña incorrectos.');
+                }
                 logout();
-                throw new Error('Sesion expirada. Por favor, inicie sesion nuevamente.');
+                throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
             }
 
             const errorBody = await readBody().catch(() => ({}));
