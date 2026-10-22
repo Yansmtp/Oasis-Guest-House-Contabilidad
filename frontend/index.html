@@ -30,23 +30,24 @@
                 <a href="#" class="nav-link" data-section="movements">
                     <i class="fas fa-exchange-alt"></i> Movimientos
                 </a>
-                <a href="#" class="nav-link" data-section="clients">
+                <a href="#" class="nav-link warehouse-admin-link" data-section="clients">
                     <i class="fas fa-users"></i> Clientes
                 </a>
-                <a href="#" class="nav-link" data-section="cost-centers">
+                <a href="#" class="nav-link warehouse-admin-link" data-section="cost-centers">
                     <i class="fas fa-building"></i> Centros de Costo
                 </a>
                 <a href="#" class="nav-link" data-section="reports">
                     <i class="fas fa-chart-bar"></i> Reportes
                 </a>
-                <a href="#" class="nav-link" data-section="accounting">
+                <a href="#" class="nav-link admin-only" data-section="accounting">
                     <i class="fas fa-balance-scale"></i> Contabilidad
                 </a>
-                <a href="#" class="nav-link" data-section="company">
+                <a href="#" class="nav-link admin-only" data-section="company">
                     <i class="fas fa-cog"></i> Configuración
                 </a>
                 <div class="navbar-user" id="user-info">
                     <span id="user-name">Usuario</span>
+                    <small id="user-role-label"></small>
                     <button class="btn btn-sm btn-outline" onclick="logout()">
                         <i class="fas fa-sign-out-alt"></i> Salir
                     </button>
@@ -192,6 +193,7 @@
                                                     <th>Documento</th>
                                                     <th>Cliente/Centro</th>
                                                     <th>Total</th>
+                                                    <th>Estado</th>
                                                     <th>Acciones</th>
                                                 </tr>
                                             </thead>
@@ -228,7 +230,7 @@
                 <div class="container">
                     <div class="section-header">
                         <h1><i class="fas fa-boxes"></i> Gestión de Productos</h1>
-                        <button class="btn btn-primary" onclick="showAddProductModal()">
+                        <button class="btn btn-primary admin-only" onclick="showAddProductModal()">
                             <i class="fas fa-plus"></i> Nuevo Producto
                         </button>
                     </div>
@@ -281,10 +283,10 @@
                     <div class="section-header">
                         <h1><i class="fas fa-exchange-alt"></i> Movimientos</h1>
                         <div class="section-header-actions">
-                            <button class="btn btn-primary" onclick="showMovementModal('ENTRADA')">
+                            <button class="btn btn-primary movement-create-only" onclick="showMovementModal('ENTRADA')">
                                 <i class="fas fa-arrow-down"></i> Nueva Entrada
                             </button>
-                            <button class="btn btn-warning" onclick="showMovementModal('SALIDA')">
+                            <button class="btn btn-warning movement-create-only" onclick="showMovementModal('SALIDA')">
                                 <i class="fas fa-arrow-up"></i> Nueva Salida
                             </button>
                         </div>
@@ -310,6 +312,15 @@
                                                onchange="filterMovements()">
                                     </div>
                                     <div class="col-md-3">
+                                        <select id="movement-status-filter" class="form-control" onchange="filterMovements()">
+                                            <option value="">Todos los estados</option>
+                                            <option value="PENDING">Pendientes</option>
+                                            <option value="POSTED">Aprobados</option>
+                                            <option value="REJECTED">Rechazados</option>
+                                            <option value="REVERSED">Revertidos</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
                                         <button class="btn btn-secondary btn-block" onclick="clearMovementFilters()">
                                             <i class="fas fa-times"></i> Limpiar
                                         </button>
@@ -328,6 +339,7 @@
                                             <th>Descripción</th>
                                             <th>Productos</th>
                                             <th>Total</th>
+                                            <th>Estado</th>
                                             <th class="col-actions">Acciones</th>
                                         </tr>
                                     </thead>
@@ -350,7 +362,7 @@
                 <div class="container">
                     <div class="section-header">
                         <h1><i class="fas fa-users"></i> Clientes</h1>
-                        <button class="btn btn-primary" onclick="showAddClientModal()">
+                        <button class="btn btn-primary admin-only" onclick="showAddClientModal()">
                             <i class="fas fa-plus"></i> Nuevo Cliente
                         </button>
                     </div>
@@ -394,7 +406,7 @@
                 <div class="container">
                     <div class="section-header">
                         <h1><i class="fas fa-building"></i> Centros de Costo</h1>
-                        <button class="btn btn-primary" onclick="showAddCostCenterModal()">
+                        <button class="btn btn-primary admin-only" onclick="showAddCostCenterModal()">
                             <i class="fas fa-plus"></i> Nuevo Centro
                         </button>
                     </div>
@@ -447,7 +459,7 @@
                             </div>
                         </div>
                         
-                        <div class="col-md-4">
+                        <div class="col-md-4 warehouse-hidden">
                             <div class="card report-card" onclick="showMovementsReport()">
                                 <div class="card-body text-center">
                                     <i class="fas fa-exchange-alt fa-3x text-success"></i>
@@ -467,7 +479,7 @@
                             </div>
                         </div>
                         
-                        <div class="col-md-4">
+                        <div class="col-md-4 warehouse-hidden">
                             <div class="card report-card" onclick="showClientReport()">
                                 <div class="card-body text-center">
                                     <i class="fas fa-users fa-3x text-warning"></i>
@@ -1109,6 +1121,7 @@
                         <div class="movement-details-toolbar-actions">
                             <button type="button" class="btn btn-secondary btn-icon-only"
                                     id="movement-btn-create-product"
+                                    data-role-admin-only="true"
                                     onclick="showQuickProductModal()"
                                     title="Crear producto" aria-label="Crear producto">
                                 <i class="fas fa-box-open"></i>
@@ -1418,7 +1431,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeQuickProductModal()">Cancelar</button>
-                <button class="btn btn-primary" onclick="saveQuickProductFromMovement()">Crear y Agregar</button>
+                <button class="btn btn-primary admin-only" onclick="saveQuickProductFromMovement()">Crear y Agregar</button>
             </div>
         </div>
 
@@ -1461,8 +1474,9 @@
                     <div class="form-group">
                         <label>Rol *</label>
                         <select id="user-role-input" class="form-control" required>
-                            <option value="USER">USER</option>
-                            <option value="ADMIN">ADMIN</option>
+                            <option value="ADMIN">Administrador</option>
+                            <option value="WAREHOUSE">Almacén</option>
+                            <option value="VIEWER">Solo lectura</option>
                         </select>
                     </div>
                     <div class="form-group">

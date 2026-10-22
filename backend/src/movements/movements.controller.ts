@@ -3,6 +3,7 @@ import { MovementsService } from './movements.service';
 import { CreateMovementDto } from './dto/create-movement.dto';
 import { JwtAuthGuard } from '../shared/guards/jwt-auth.guard';
 import { AdminRoleGuard } from '../shared/guards/admin-role.guard';
+import { InventoryWriteGuard } from '../shared/guards/inventory-write.guard';
 
 @Controller('movements')
 @UseGuards(JwtAuthGuard)
@@ -10,8 +11,9 @@ export class MovementsController {
   constructor(private readonly movementsService: MovementsService) {}
 
   @Post()
+  @UseGuards(InventoryWriteGuard)
   create(@Request() req, @Body() createMovementDto: CreateMovementDto) {
-    return this.movementsService.create(req.user.userId, createMovementDto);
+    return this.movementsService.create(req.user.userId, req.user.role, createMovementDto);
   }
 
   @Get()
@@ -19,6 +21,8 @@ export class MovementsController {
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10',
     @Query('type') type?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('clientId') clientId?: string,
@@ -30,11 +34,13 @@ export class MovementsController {
     return this.movementsService.findAll(
       parseInt(page),
       parseInt(limit),
-      type as any,
+      search,
       start,
       end,
       clientId ? parseInt(clientId) : undefined,
       costCenterId ? parseInt(costCenterId) : undefined,
+      type as any,
+      status as any,
     );
   }
 
@@ -81,6 +87,18 @@ export class MovementsController {
   @UseGuards(AdminRoleGuard)
   reverse(@Param('id') id: string, @Request() req) {
     return this.movementsService.reverse(+id, req.user.userId);
+  }
+
+  @Post(':id/approve')
+  @UseGuards(AdminRoleGuard)
+  approve(@Param('id') id: string, @Request() req) {
+    return this.movementsService.approve(+id, req.user.userId);
+  }
+
+  @Post(':id/reject')
+  @UseGuards(AdminRoleGuard)
+  reject(@Param('id') id: string, @Request() req, @Body('reason') reason?: string) {
+    return this.movementsService.reject(+id, req.user.userId, reason);
   }
 
   @Get(':id/voucher')

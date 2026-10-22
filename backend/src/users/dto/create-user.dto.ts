@@ -14,6 +14,6 @@ export class CreateUserDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['ADMIN', 'USER'])
+  @IsIn(['ADMIN', 'WAREHOUSE', 'VIEWER'])
   role?: string;
 }

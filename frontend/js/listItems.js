@@ -4,6 +4,7 @@
 
 function buildProductListItemHtml(product, options = {}) {
     const canDelete = !!options.canDelete;
+    const canEdit = !!options.canEdit;
     const stock = parseNumberSafe(product.stock);
     const minStock = parseNumberSafe(product.minStock);
     const unitCost = parseNumberSafe(product.unitCost);
@@ -33,9 +34,9 @@ function buildProductListItemHtml(product, options = {}) {
                 </div>
             </div>
             <div class="list-item-actions">
-                <button type="button" class="btn btn-sm btn-outline" onclick="editProduct(${product.id})" title="Editar" aria-label="Editar">
+                ${canEdit ? `<button type="button" class="btn btn-sm btn-outline" onclick="editProduct(${product.id})" title="Editar" aria-label="Editar">
                     <i class="fas fa-edit"></i>
-                </button>
+                </button>` : ''}
                 ${canDelete ? `
                 <button type="button" class="btn btn-sm btn-outline" onclick="deleteProduct(${product.id})" title="Eliminar" aria-label="Eliminar">
                     <i class="fas fa-trash"></i>
@@ -50,6 +51,7 @@ function buildProductListItemHtml(product, options = {}) {
 
 function buildMovementListItemHtml(movement, options = {}) {
     const canReverse = !!options.canReverse;
+    const canApprove = !!options.canApprove;
     const total = (movement.details || []).reduce(
         (sum, detail) => sum + (parseNumberSafe(detail.totalCost) || 0),
         0
@@ -77,11 +79,14 @@ function buildMovementListItemHtml(movement, options = {}) {
         ? `<span class="list-item-meta-muted">${escapeHtml(movement.description)}</span>`
         : '';
 
+    const statusLabels = { PENDING: 'Pendiente de aprobación', POSTED: 'Aprobado', REJECTED: 'Rechazado', REVERSED: 'Revertido' };
+    const statusLabel = statusLabels[movement.status] || statusLabels.POSTED;
     const actions = `
         <button type="button" class="btn btn-sm btn-outline" onclick="viewMovement(${movement.id})" title="Ver" aria-label="Ver">
             <i class="fas fa-eye"></i>
         </button>
-        ${canReverse && movement.status !== 'REVERSED' ? `
+        ${canApprove && movement.status === 'PENDING' ? `<button type="button" class="btn btn-sm btn-primary" onclick="approveMovement(${movement.id})" title="Aprobar"><i class="fas fa-check"></i></button><button type="button" class="btn btn-sm btn-danger" onclick="rejectMovement(${movement.id})" title="Rechazar"><i class="fas fa-times"></i></button>` : ''}
+        ${canReverse && movement.status === 'POSTED' ? `
         <button type="button" class="btn btn-sm btn-danger" onclick="reverseMovement(${movement.id})" title="Anular" aria-label="Anular">
             <i class="fas fa-rotate-left"></i>
         </button>` : ''}
@@ -95,6 +100,7 @@ function buildMovementListItemHtml(movement, options = {}) {
             <div class="list-item-body">
                 <div class="list-item-top">
                     <span class="status-badge ${typeClass}">${isReversed ? 'Anulado · ' : ''}${typeLabel}</span>
+                    <span class="status-badge">${escapeHtml(statusLabel)}</span>
                     <span class="list-item-date">${escapeHtml(formatDate(movement.date))}</span>
                 </div>
                 <div class="list-item-title">${escapeHtml(movement.documentNumber || 'Sin documento')}</div>
@@ -112,6 +118,7 @@ function buildMovementListItemHtml(movement, options = {}) {
 
 function buildClientListItemHtml(client, options = {}) {
     const canDelete = !!options.canDelete;
+    const canEdit = !!options.canEdit;
     const statusClass = client.isActive ? 'status-active' : 'status-inactive';
     const statusText = client.isActive ? 'Activo' : 'Inactivo';
     const contact = [client.email, client.phone].filter(Boolean).join(' · ') || 'Sin contacto';
@@ -130,9 +137,9 @@ function buildClientListItemHtml(client, options = {}) {
                 </div>
             </div>
             <div class="list-item-actions">
-                <button type="button" class="btn btn-sm btn-outline" onclick="editClient(${client.id})" title="Editar" aria-label="Editar">
+                ${canEdit ? `<button type="button" class="btn btn-sm btn-outline" onclick="editClient(${client.id})" title="Editar" aria-label="Editar">
                     <i class="fas fa-edit"></i>
-                </button>
+                </button>` : ''}
                 ${canDelete ? `
                 <button type="button" class="btn btn-sm btn-outline" onclick="deleteClient(${client.id})" title="Eliminar" aria-label="Eliminar">
                     <i class="fas fa-trash"></i>
@@ -147,6 +154,7 @@ function buildClientListItemHtml(client, options = {}) {
 
 function buildCostCenterListItemHtml(center, options = {}) {
     const canDelete = !!options.canDelete;
+    const canEdit = !!options.canEdit;
     const statusClass = center.isActive ? 'status-active' : 'status-inactive';
     const statusText = center.isActive ? 'Activo' : 'Inactivo';
     const desc = center.description
@@ -164,9 +172,9 @@ function buildCostCenterListItemHtml(center, options = {}) {
                 ${desc}
             </div>
             <div class="list-item-actions">
-                <button type="button" class="btn btn-sm btn-outline" onclick="editCostCenter(${center.id})" title="Editar" aria-label="Editar">
+                ${canEdit ? `<button type="button" class="btn btn-sm btn-outline" onclick="editCostCenter(${center.id})" title="Editar" aria-label="Editar">
                     <i class="fas fa-edit"></i>
-                </button>
+                </button>` : ''}
                 ${canDelete ? `
                 <button type="button" class="btn btn-sm btn-outline" onclick="deleteCostCenter(${center.id})" title="Eliminar" aria-label="Eliminar">
                     <i class="fas fa-trash"></i>
@@ -181,12 +189,13 @@ function buildCostCenterListItemHtml(center, options = {}) {
 
 function buildUserListItemHtml(user) {
     const roleClass = user.role === 'ADMIN' ? 'status-active' : 'status-inactive';
+    const roleLabel = ({ ADMIN: 'Administrador', WAREHOUSE: 'Almacén', USER: 'Almacén', VIEWER: 'Solo lectura' })[user.role] || 'Usuario';
     return `
         <div class="list-item-card">
             <div class="list-item-body">
                 <div class="list-item-top">
                     <span class="list-item-code">${escapeHtml(user.email || '')}</span>
-                    <span class="status-badge ${roleClass}">${escapeHtml(user.role || 'USER')}</span>
+                    <span class="status-badge ${roleClass}">${escapeHtml(roleLabel)}</span>
                 </div>
                 <div class="list-item-title">${escapeHtml(user.name || '')}</div>
                 <div class="list-item-meta">

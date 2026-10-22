@@ -11,6 +11,7 @@ export class ClientsController {
   constructor(private readonly clientsService: ClientsService) {}
 
   @Post()
+  @UseGuards(AdminRoleGuard)
   create(@Body() createClientDto: CreateClientDto) {
     return this.clientsService.create(createClientDto);
   }
@@ -53,6 +54,7 @@ export class ClientsController {
   }
 
   @Patch(':id')
+  @UseGuards(AdminRoleGuard)
   update(@Param('id') id: string, @Body() updateClientDto: UpdateClientDto) {
     return this.clientsService.update(+id, updateClientDto);
   }

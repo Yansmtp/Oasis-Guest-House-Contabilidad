@@ -71,11 +71,19 @@ function showMainApp() {
     if (user) {
         document.getElementById('user-name').textContent = user.name;
     }
+    applyRoleVisibility();
+}
 
-    const companyLink = document.querySelector('.nav-link[data-section="company"]');
-    if (companyLink) {
-        companyLink.style.display = isAdmin() ? '' : 'none';
-    }
+function applyRoleVisibility() {
+    const role = getUserRole();
+    const roleLabel = document.getElementById('user-role-label');
+    if (roleLabel) roleLabel.textContent = ({ ADMIN: 'Administrador', WAREHOUSE: 'Almacén', VIEWER: 'Solo lectura' })[role] || 'Usuario';
+    document.querySelectorAll('.admin-only').forEach(el => { el.style.display = isAdmin() ? '' : 'none'; });
+    document.querySelectorAll('[data-role-admin-only="true"]').forEach(el => { el.style.display = isAdmin() ? '' : 'none'; });
+    document.querySelectorAll('.warehouse-admin-link').forEach(el => { el.style.display = isWarehouse() ? 'none' : ''; });
+    document.querySelectorAll('.movement-create-only').forEach(el => { el.style.display = isViewer() ? 'none' : ''; });
+    document.querySelectorAll('.role-admin-only').forEach(el => { el.style.display = isAdmin() ? '' : 'none'; });
+    document.querySelectorAll('.warehouse-hidden').forEach(el => { el.style.display = isWarehouse() ? 'none' : ''; });
 }
 
 // Event Listeners

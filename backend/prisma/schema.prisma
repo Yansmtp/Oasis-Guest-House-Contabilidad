@@ -13,8 +13,10 @@ enum MovementType {
 }
 
 enum MovementStatus {
+  PENDING
   POSTED
   REVERSED
+  REJECTED
 }
 
 enum AccountType {
@@ -48,11 +50,12 @@ model User {
   email     String   @unique
   name      String
   password  String
-  role      String   @default("USER")
+  role      String   @default("WAREHOUSE")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   movements Movement[]
+  reviewedMovements Movement[] @relation("MovementReviewedBy")
   auditLogs AuditLog[]
   createdJournalEntries JournalEntry[] @relation("JournalCreatedBy")
   postedJournalEntries JournalEntry[] @relation("JournalPostedBy")
@@ -125,6 +128,10 @@ model Movement {
   counterpartAccount Account?   @relation("MovementCounterpartAccount", fields: [counterpartAccountId], references: [id], onDelete: Restrict)
   userId        Int
   user          User            @relation(fields: [userId], references: [id])
+  reviewedById  Int?
+  reviewedBy    User?           @relation("MovementReviewedBy", fields: [reviewedById], references: [id], onDelete: Restrict)
+  reviewedAt    DateTime?
+  rejectionReason String?
   
   // Detalles
   details       MovementDetail[]
@@ -138,6 +145,7 @@ model Movement {
   updatedAt     DateTime        @updatedAt
 
   @@index([status, date])
+  @@index([status, createdAt])
 }
 
 model MovementDetail {

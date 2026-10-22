@@ -30,7 +30,7 @@ export class UsersService {
 
   async create(dto: CreateUserDto) {
     const email = dto.email.trim().toLowerCase();
-    const role = (dto.role || 'USER').toUpperCase();
+    const role = (dto.role || 'WAREHOUSE').toUpperCase();
 
     const exists = await this.prisma.user.findUnique({ where: { email } });
     if (exists) throw new ConflictException('El usuario ya existe');
@@ -73,15 +73,15 @@ export class UsersService {
       if (dup) throw new ConflictException('Ya existe un usuario con ese email');
     }
 
-    if (existing.role === 'ADMIN' && data.role === 'USER') {
+    if (existing.role === 'ADMIN' && data.role && data.role !== 'ADMIN') {
       const totalAdmins = await this.prisma.user.count({ where: { role: 'ADMIN' } });
       if (totalAdmins <= 1) {
         throw new BadRequestException('Debe existir al menos un administrador');
       }
     }
 
-    if (id === currentUserId && data.role === 'USER') {
-      throw new BadRequestException('No puede quitarse el rol ADMIN a si mismo');
+    if (id === currentUserId && data.role && data.role !== 'ADMIN') {
+      throw new BadRequestException('No puede quitarse el rol de administrador a si mismo');
     }
 
     const updated = await this.prisma.user.update({

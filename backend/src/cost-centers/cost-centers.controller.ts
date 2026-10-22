@@ -11,6 +11,7 @@ export class CostCentersController {
   constructor(private readonly costCentersService: CostCentersService) {}
 
   @Post()
+  @UseGuards(AdminRoleGuard)
   create(@Body() createCostCenterDto: CreateCostCenterDto) {
     return this.costCentersService.create(createCostCenterDto);
   }
@@ -53,6 +54,7 @@ export class CostCentersController {
   }
 
   @Patch(':id')
+  @UseGuards(AdminRoleGuard)
   update(@Param('id') id: string, @Body() updateCostCenterDto: UpdateCostCenterDto) {
     return this.costCentersService.update(+id, updateCostCenterDto);
   }

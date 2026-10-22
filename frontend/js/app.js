@@ -1,5 +1,13 @@
 // Navegación entre secciones
 function showSection(sectionId) {
+    if (['company', 'accounting'].includes(sectionId) && !isAdmin()) {
+        showAlert('Solo administradores pueden entrar a esta sección', 'warning');
+        return;
+    }
+    if (isWarehouse() && ['clients', 'cost-centers'].includes(sectionId)) {
+        showAlert('Esta sección no está disponible para el perfil de almacén', 'warning');
+        return;
+    }
     if (sectionId === 'company' && !isAdmin()) {
         showAlert('Solo administradores pueden entrar a Configuración', 'warning');
         return;

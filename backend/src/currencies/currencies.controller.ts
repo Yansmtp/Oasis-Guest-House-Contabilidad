@@ -4,7 +4,7 @@ import { JwtAuthGuard } from '../shared/guards/jwt-auth.guard';
 import { AdminRoleGuard } from '../shared/guards/admin-role.guard';
 
 @Controller('currencies')
-@UseGuards(JwtAuthGuard, AdminRoleGuard)
+@UseGuards(JwtAuthGuard)
 export class CurrenciesController {
   constructor(private readonly currenciesService: CurrenciesService) {}
 
@@ -15,6 +15,7 @@ export class CurrenciesController {
   }
 
   @Post()
+  @UseGuards(AdminRoleGuard)
   async create(@Body() body: { code?: string; name?: string; rate?: number; isDefault?: boolean }) {
     const created = await this.currenciesService.createCurrency({
       code: body.code || '',
@@ -26,6 +27,7 @@ export class CurrenciesController {
   }
 
   @Patch(':code')
+  @UseGuards(AdminRoleGuard)
   async update(@Param('code') code: string, @Body() body: { rate?: number; isDefault?: boolean }) {
     let updated: any = null;
     if (typeof body.rate === 'number') {
@@ -38,6 +40,7 @@ export class CurrenciesController {
   }
 
   @Post('external/:code')
+  @UseGuards(AdminRoleGuard)
   async refreshExternalRate(@Param('code') code: string) {
     const updated = await this.currenciesService.updateRateFromExternal(code);
     return { data: updated };

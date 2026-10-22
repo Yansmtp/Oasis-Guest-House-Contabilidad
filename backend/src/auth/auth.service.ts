@@ -71,7 +71,7 @@ export class AuthService {
 
     return {
       message: 'Usuario registrado exitosamente',
-      user: result,
+      user: { id: result.id, email: result.email, name: result.name, role: result.role },
     };
   }
 }

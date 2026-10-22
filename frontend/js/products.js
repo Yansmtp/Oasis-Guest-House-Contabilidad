@@ -363,7 +363,7 @@ function renderProductsTable() {
 
         if (compact) {
             row.className = 'table-compact-row' + (isLowStock ? ' table-danger' : '');
-            row.innerHTML = `<td colspan="9" class="table-compact-cell">${buildProductListItemHtml(product, { canDelete })}</td>`;
+            row.innerHTML = `<td colspan="9" class="table-compact-cell">${buildProductListItemHtml(product, { canDelete, canEdit: isAdmin() })}</td>`;
         } else {
             const unitCost = parseNumberSafe(product.unitCost);
             const totalValue = stock * unitCost;
@@ -387,9 +387,9 @@ function renderProductsTable() {
                     </span>
                 </td>
                 <td class="actions">
-                    <button class="btn btn-sm btn-outline" onclick="editProduct(${product.id})" title="Editar">
+                    ${isAdmin() ? `<button class="btn btn-sm btn-outline" onclick="editProduct(${product.id})" title="Editar">
                         <i class="fas fa-edit"></i>
-                    </button>
+                    </button>` : ''}
                     ${canDelete ? `
                     <button class="btn btn-sm btn-outline" onclick="deleteProduct(${product.id})" title="Eliminar">
                         <i class="fas fa-trash"></i>

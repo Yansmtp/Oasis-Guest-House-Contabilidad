@@ -52,7 +52,7 @@ function renderClientsTable() {
 
         if (compact) {
             row.className = 'table-compact-row';
-            row.innerHTML = `<td colspan="7" class="table-compact-cell">${buildClientListItemHtml(client, { canDelete })}</td>`;
+            row.innerHTML = `<td colspan="7" class="table-compact-cell">${buildClientListItemHtml(client, { canDelete, canEdit: isAdmin() })}</td>`;
         } else {
             row.innerHTML = `
                 <td class="cell-compact">${client.code}</td>
@@ -69,9 +69,9 @@ function renderClientsTable() {
                     </span>
                 </td>
                 <td class="actions">
-                    <button class="btn btn-sm btn-outline" onclick="editClient(${client.id})" title="Editar">
+                    ${isAdmin() ? `<button class="btn btn-sm btn-outline" onclick="editClient(${client.id})" title="Editar">
                         <i class="fas fa-edit"></i>
-                    </button>
+                    </button>` : ''}
                     ${canDelete ? `
                     <button class="btn btn-sm btn-outline" onclick="deleteClient(${client.id})" title="Eliminar">
                         <i class="fas fa-trash"></i>

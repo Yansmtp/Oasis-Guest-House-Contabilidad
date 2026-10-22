@@ -52,7 +52,7 @@ function renderCostCentersTable() {
 
         if (compact) {
             row.className = 'table-compact-row';
-            row.innerHTML = `<td colspan="5" class="table-compact-cell">${buildCostCenterListItemHtml(center, { canDelete })}</td>`;
+            row.innerHTML = `<td colspan="5" class="table-compact-cell">${buildCostCenterListItemHtml(center, { canDelete, canEdit: isAdmin() })}</td>`;
         } else {
             row.innerHTML = `
                 <td class="cell-compact">${center.code}</td>
@@ -67,9 +67,9 @@ function renderCostCentersTable() {
                     </span>
                 </td>
                 <td class="actions">
-                    <button class="btn btn-sm btn-outline" onclick="editCostCenter(${center.id})" title="Editar">
+                    ${isAdmin() ? `<button class="btn btn-sm btn-outline" onclick="editCostCenter(${center.id})" title="Editar">
                         <i class="fas fa-edit"></i>
-                    </button>
+                    </button>` : ''}
                     ${canDelete ? `
                     <button class="btn btn-sm btn-outline" onclick="deleteCostCenter(${center.id})" title="Eliminar">
                         <i class="fas fa-trash"></i>

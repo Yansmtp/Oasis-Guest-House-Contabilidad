@@ -7,7 +7,7 @@ function openUserModal(user = null) {
     document.getElementById('user-id').value = user?.id || '';
     document.getElementById('user-name-input').value = user?.name || '';
     document.getElementById('user-email-input').value = user?.email || '';
-    document.getElementById('user-role-input').value = user?.role || 'USER';
+    document.getElementById('user-role-input').value = user?.role === 'USER' ? 'WAREHOUSE' : (user?.role || 'WAREHOUSE');
     document.getElementById('user-password-input').value = '';
 
     const editing = !!user;
@@ -50,7 +50,7 @@ async function loadUsers() {
                 row.innerHTML = `
                     <td>${u.name || ''}</td>
                     <td>${u.email || ''}</td>
-                    <td><span class="status-badge ${u.role === 'ADMIN' ? 'status-active' : 'status-inactive'}">${u.role || 'USER'}</span></td>
+                    <td><span class="status-badge ${u.role === 'ADMIN' ? 'status-active' : 'status-inactive'}">${({ ADMIN: 'Administrador', WAREHOUSE: 'Almacén', USER: 'Almacén', VIEWER: 'Solo lectura' })[u.role] || 'Usuario'}</span></td>
                     <td>${formatDate(u.createdAt)}</td>
                     <td class="actions">
                         <button class="btn btn-sm btn-outline" onclick="editUser(${u.id})" title="Editar"><i class="fas fa-edit"></i></button>
@@ -75,7 +75,7 @@ async function saveUser() {
     const id = document.getElementById('user-id').value;
     const name = (document.getElementById('user-name-input').value || '').trim();
     const email = (document.getElementById('user-email-input').value || '').trim();
-    const role = (document.getElementById('user-role-input').value || 'USER').trim().toUpperCase();
+    const role = (document.getElementById('user-role-input').value || 'WAREHOUSE').trim().toUpperCase();
     const password = document.getElementById('user-password-input').value || '';
 
     if (!name || !email) {

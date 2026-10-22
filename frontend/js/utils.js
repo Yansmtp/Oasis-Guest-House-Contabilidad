@@ -256,6 +256,13 @@ function isAdmin() {
     return String(user?.role || '').toUpperCase() === 'ADMIN';
 }
 
+function getUserRole() {
+    const role = String(getCurrentUser()?.role || '').toUpperCase();
+    return role === 'USER' ? 'WAREHOUSE' : role;
+}
+function isWarehouse() { return getUserRole() === 'WAREHOUSE'; }
+function isViewer() { return getUserRole() === 'VIEWER'; }
+
 function formatNumber(number) {
     return new Intl.NumberFormat('es-ES', {
         minimumFractionDigits: 2,

@@ -112,7 +112,9 @@ export class MovementsService {
     startDate?: Date,
     endDate?: Date,
     clientId?: number,
-    costCenterId?: number
+    costCenterId?: number,
+    type?: MovementType,
+    status?: MovementStatus,
   ) {
     const skip = (page - 1) * limit;
 
@@ -132,6 +134,8 @@ export class MovementsService {
         } : undefined,
         clientId ? { clientId } : undefined,
         costCenterId ? { costCenterId } : undefined,
+        type ? { type } : undefined,
+        status ? { status } : undefined,
       ].filter(Boolean),
     };
 
@@ -140,7 +144,12 @@ export class MovementsService {
         where,
         skip,
         take: limit,
-        include: { client: true, costCenter: true, details: { include: { product: true } } },
+        include: {
+          client: true, costCenter: true,
+          user: { select: { id: true, name: true, email: true } },
+          reviewedBy: { select: { id: true, name: true, email: true } },
+          details: { include: { product: true } },
+        },
         orderBy: { date: 'desc' },
       }),
       this.prisma.movement.count({ where }),
@@ -166,6 +175,7 @@ export class MovementsService {
         client: true,
         costCenter: true,
         user: { select: { id: true, name: true, email: true } },
+        reviewedBy: { select: { id: true, name: true, email: true } },
         details: { include: { product: true } },
       },
     });
@@ -180,7 +190,8 @@ export class MovementsService {
   // ---------------------------
   // Crear un movimiento
   // ---------------------------
-  async create(userId: number, createMovementDto: CreateMovementDto) {
+  async create(userId: number, creatorRole: string, createMovementDto: CreateMovementDto) {
+    const requiresApproval = String(creatorRole).toUpperCase() !== 'ADMIN';
     if (!createMovementDto.clientId && !createMovementDto.costCenterId) {
       throw new BadRequestException('Debe especificar un cliente o un centro de costo');
     }
@@ -195,7 +206,7 @@ export class MovementsService {
         orderBy: { id: 'asc' },
         select: { accountingCutoverAt: true },
       });
-      if (company?.accountingCutoverAt && !createMovementDto.counterpartAccountId) {
+      if (!requiresApproval && company?.accountingCutoverAt && !createMovementDto.counterpartAccountId) {
         throw new BadRequestException('Seleccione la cuenta contable de contrapartida para este movimiento');
       }
       // Determinar moneda y tasa al momento de la transacción
@@ -249,6 +260,8 @@ export class MovementsService {
           costCenterId: createMovementDto.costCenterId,
           counterpartAccountId: createMovementDto.counterpartAccountId,
           userId: userId,
+          status: requiresApproval ? MovementStatus.PENDING : MovementStatus.POSTED,
+          ...(requiresApproval ? {} : { reviewedById: userId, reviewedAt: new Date() }),
           currencyCode,
           rateAtTransaction,
         },
@@ -278,7 +291,7 @@ export class MovementsService {
           throw new BadRequestException(`El producto ${product.name} está inactivo`);
         }
 
-        if (isHelpCenter && !this.isProductFromLogosMission(product)) {
+        if (!requiresApproval && isHelpCenter && !this.isProductFromLogosMission(product)) {
           if (!createMovementDto.adminPassword) {
             throw new BadRequestException(
               `El producto ${product.name} no proviene de Logos Misión y requiere contraseña de administrador para forzar la salida.`
@@ -307,7 +320,13 @@ export class MovementsService {
         });
 
         // Actualizar stock del producto
-        if (createMovementDto.type === MovementType.ENTRADA) {
+        if (requiresApproval) {
+          if (createMovementDto.type === MovementType.SALIDA && toNum(product.stock) < detailDto.quantity) {
+            throw new BadRequestException(
+              `Stock insuficiente para ${product.name}. Stock actual: ${toNum(product.stock)}, requerido: ${detailDto.quantity}`
+            );
+          }
+        } else if (createMovementDto.type === MovementType.ENTRADA) {
           const currentStock = toNum(product.stock);
           const currentCost = toNum(product.unitCost);
           const qty = detailDto.quantity;
@@ -341,7 +360,7 @@ export class MovementsService {
         details.push(detail);
       }
 
-      if (company?.accountingCutoverAt) {
+      if (!requiresApproval && company?.accountingCutoverAt) {
         await this.accountingService.postInventoryMovement(tx, {
           movementId: movement.id,
           actorId: userId,
@@ -360,11 +379,12 @@ export class MovementsService {
       await tx.auditLog.create({
         data: {
           userId,
-          action: 'CREATE',
+          action: requiresApproval ? 'REQUEST' : 'CREATE',
           table: 'Movement',
           recordId: movement.id,
           newData: {
             type: movement.type,
+            status: movement.status,
             date: movement.date.toISOString(),
             documentNumber,
             currencyCode,
@@ -543,6 +563,7 @@ export class MovementsService {
         client: true,
         costCenter: true,
         user: { select: { name: true, email: true } },
+        reviewedBy: { select: { name: true, email: true } },
         details: { include: { product: true } },
       },
     });
@@ -560,6 +581,10 @@ export class MovementsService {
       client: movement.client,
       costCenter: movement.costCenter,
       user: movement.user,
+      reviewedBy: movement.reviewedBy,
+      status: movement.status,
+      reviewedAt: movement.reviewedAt,
+      rejectionReason: movement.rejectionReason,
       currencyCode: movement.currencyCode,
       rateAtTransaction: toNum(movement.rateAtTransaction || 1),
       details: movement.details.map(detail => ({
@@ -575,6 +600,108 @@ export class MovementsService {
     };
 
     return voucher;
+  }
+
+  async approve(id: number, reviewerId: number) {
+    return this.prisma.$transaction(async (tx) => {
+      const movement = await tx.movement.findUnique({
+        where: { id },
+        include: { details: true, user: { select: { id: true } } },
+      });
+      if (!movement) throw new NotFoundException('Movimiento no encontrado');
+      if (movement.status !== MovementStatus.PENDING) {
+        throw new BadRequestException('Solo se pueden aprobar movimientos pendientes');
+      }
+      if (movement.userId === reviewerId) {
+        throw new BadRequestException('Otra persona administradora debe aprobar este movimiento');
+      }
+
+      const company = await tx.company.findFirst({
+        orderBy: { id: 'asc' },
+        select: { accountingCutoverAt: true },
+      });
+      if (company?.accountingCutoverAt && !movement.counterpartAccountId) {
+        throw new BadRequestException('El movimiento requiere una cuenta contable de contrapartida antes de aprobarse');
+      }
+      const details = [];
+      for (const detail of movement.details) {
+        const product = await tx.product.findUnique({ where: { id: detail.productId } });
+        if (!product || !product.isActive) {
+          throw new BadRequestException(`El producto ${detail.productId} no existe o está inactivo`);
+        }
+        if (movement.type === MovementType.ENTRADA) {
+          const qty = toNum(detail.quantity);
+          const currentStock = toNum(product.stock);
+          const currentCost = toNum(product.unitCost);
+          const unitCost = toNum(detail.unitCost);
+          const rate = toNum(movement.rateAtTransaction || 1);
+          const unitCostUsd = movement.currencyCode === 'USD' ? unitCost : unitCost * rate;
+          const newStock = currentStock + qty;
+          const newCost = newStock > 0 ? ((currentStock * currentCost) + (qty * unitCostUsd)) / newStock : unitCostUsd;
+          await tx.product.update({
+            where: { id: product.id },
+            data: { stock: { increment: qty }, unitCost: newCost },
+          });
+        } else {
+          const stockUpdate = await tx.product.updateMany({
+            where: { id: product.id, isActive: true, stock: { gte: detail.quantity } },
+            data: { stock: { decrement: detail.quantity } },
+          });
+          if (stockUpdate.count !== 1) {
+            throw new BadRequestException(`Stock insuficiente para ${product.name} al aprobar el movimiento`);
+          }
+        }
+        details.push(detail);
+      }
+
+      if (company?.accountingCutoverAt) {
+        await this.accountingService.postInventoryMovement(tx, {
+          movementId: movement.id,
+          actorId: reviewerId,
+          date: movement.date,
+          description: movement.description,
+          documentNumber: movement.documentNumber || `MOV-${movement.id}`,
+          type: movement.type,
+          currencyCode: movement.currencyCode,
+          rateAtTransaction: movement.rateAtTransaction,
+          counterpartAccountId: movement.counterpartAccountId,
+          costCenterId: movement.costCenterId,
+          details,
+        });
+      }
+
+      const now = new Date();
+      const updated = await tx.movement.updateMany({
+        where: { id, status: MovementStatus.PENDING },
+        data: { status: MovementStatus.POSTED, reviewedById: reviewerId, reviewedAt: now, rejectionReason: null },
+      });
+      if (updated.count !== 1) throw new BadRequestException('El movimiento ya fue revisado; actualiza la lista');
+      await tx.auditLog.create({
+        data: { userId: reviewerId, action: 'APPROVE', table: 'Movement', recordId: id,
+          oldData: { status: MovementStatus.PENDING }, newData: { status: MovementStatus.POSTED, createdBy: movement.userId } },
+      });
+      return { ok: true, id, status: MovementStatus.POSTED };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }
+
+  async reject(id: number, reviewerId: number, reason?: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const movement = await tx.movement.findUnique({ where: { id }, select: { id: true, userId: true, status: true } });
+      if (!movement) throw new NotFoundException('Movimiento no encontrado');
+      if (movement.status !== MovementStatus.PENDING) throw new BadRequestException('Solo se pueden rechazar movimientos pendientes');
+      if (movement.userId === reviewerId) throw new BadRequestException('Otra persona administradora debe revisar este movimiento');
+      const now = new Date();
+      const updated = await tx.movement.updateMany({
+        where: { id, status: MovementStatus.PENDING },
+        data: { status: MovementStatus.REJECTED, reviewedById: reviewerId, reviewedAt: now, rejectionReason: reason?.trim() || null },
+      });
+      if (updated.count !== 1) throw new BadRequestException('El movimiento ya fue revisado; actualiza la lista');
+      await tx.auditLog.create({
+        data: { userId: reviewerId, action: 'REJECT', table: 'Movement', recordId: id,
+          oldData: { status: MovementStatus.PENDING }, newData: { status: MovementStatus.REJECTED, reason: reason?.trim() || null, createdBy: movement.userId } },
+      });
+      return { ok: true, id, status: MovementStatus.REJECTED };
+    });
   }
 
   async reverse(id: number, actorId: number) {
@@ -633,6 +760,8 @@ export class MovementsService {
           costCenterId: movement.costCenterId,
           counterpartAccountId: movement.counterpartAccountId,
           userId: actorId,
+          reviewedById: actorId,
+          reviewedAt: new Date(),
           reversalOfId: movement.id,
           details: {
             create: movement.details.map(detail => ({

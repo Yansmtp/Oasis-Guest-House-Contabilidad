@@ -130,6 +130,7 @@ async function loadMovements(page = 1, filters = {}) {
         let url = `/movements?page=${page}&limit=10`;
         
         if (filters.type) url += `&type=${filters.type}`;
+        if (filters.status) url += `&status=${filters.status}`;
         if (filters.startDate) url += `&startDate=${filters.startDate}`;
         if (filters.endDate) url += `&endDate=${filters.endDate}`;
         if (filters.clientId) url += `&clientId=${filters.clientId}`;
@@ -170,7 +171,7 @@ function renderMovementsTable() {
     if (movements.length === 0) {
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td colspan="8" class="text-center">
+            <td colspan="9" class="text-center">
                 No se encontraron movimientos
             </td>
         `;
@@ -182,11 +183,12 @@ function renderMovementsTable() {
 
     movements.forEach(movement => {
         const row = document.createElement('tr');
-        const canReverse = isAdmin() && movement.status !== 'REVERSED';
+        const canReverse = isAdmin() && movement.status === 'POSTED';
+        const canApprove = isAdmin() && movement.status === 'PENDING' && movement.userId !== getCurrentUser()?.id;
 
         if (compact) {
             row.className = 'table-compact-row';
-            row.innerHTML = `<td colspan="8" class="table-compact-cell">${buildMovementListItemHtml(movement, { canReverse })}</td>`;
+            row.innerHTML = `<td colspan="9" class="table-compact-cell">${buildMovementListItemHtml(movement, { canReverse, canApprove })}</td>`;
             tbody.appendChild(row);
             return;
         }
@@ -202,6 +204,7 @@ function renderMovementsTable() {
         const currency = movement.currencyCode || 'USD';
         const rateAtTransaction = parseNumberSafe(movement.rateAtTransaction) || 1;
         const productCount = movement.details.length;
+        const statusLabel = ({ PENDING: 'Pendiente de aprobación', POSTED: 'Aprobado', REJECTED: 'Rechazado', REVERSED: 'Revertido' })[movement.status] || 'Aprobado';
 
         row.innerHTML = `
             <td class="cell-compact">${formatDate(movement.date)}</td>
@@ -215,10 +218,12 @@ function renderMovementsTable() {
             <td class="cell-text">${escapeHtml(movement.description || '')}</td>
             <td class="cell-compact">${productCount} producto(s)</td>
             <td class="cell-currency">${buildDualCurrencyHtml(total, currency, rateAtTransaction)}</td>
+            <td class="cell-compact"><span class="status-badge">${statusLabel}</span></td>
             <td class="actions">
                 <button class="btn btn-sm btn-outline" onclick="viewMovement(${movement.id})" title="Ver detalle">
                     <i class="fas fa-eye"></i>
                 </button>
+                ${canApprove ? `<button class="btn btn-sm btn-primary" onclick="approveMovement(${movement.id})" title="Aprobar"><i class="fas fa-check"></i></button><button class="btn btn-sm btn-danger" onclick="rejectMovement(${movement.id})" title="Rechazar"><i class="fas fa-times"></i></button>` : ''}
                 ${canReverse ? `
                 <button class="btn btn-sm btn-danger" onclick="reverseMovement(${movement.id})" title="Anular">
                     <i class="fas fa-rotate-left"></i>
@@ -237,6 +242,7 @@ function renderMovementsTable() {
 function filterMovements() {
     const filters = {
         type: document.getElementById('movement-type-filter').value || undefined,
+        status: document.getElementById('movement-status-filter')?.value || undefined,
         startDate: document.getElementById('movement-start-date').value || undefined,
         endDate: document.getElementById('movement-end-date').value || undefined
     };
@@ -249,6 +255,7 @@ function clearMovementFilters() {
     document.getElementById('movement-type-filter').value = '';
     document.getElementById('movement-start-date').value = '';
     document.getElementById('movement-end-date').value = '';
+    if (document.getElementById('movement-status-filter')) document.getElementById('movement-status-filter').value = '';
     loadMovements(1);
 }
 
@@ -816,7 +823,7 @@ async function saveMovement() {
             throw new Error(response.error || 'Error desconocido al guardar el movimiento');
         }
 
-        showAlert('Movimiento guardado exitosamente', 'success');
+        showAlert(isAdmin() ? 'Movimiento registrado y aprobado.' : 'Solicitud enviada; el stock cambiará cuando un administrador la apruebe.', 'success');
 
         // Proteger las llamadas que pueden fallar o no existir en algunos entornos
         try {
@@ -1032,6 +1039,12 @@ function renderMovementDetailModal(movement) {
                     <label>Registrado por</label>
                     <span>${escapeHtml(movement.user?.name || '—')}</span>
                 </div>
+                <div class="movement-detail-meta-item">
+                    <label>Estado</label>
+                    <span>${escapeHtml(({ PENDING: 'Pendiente de aprobación', POSTED: 'Aprobado', REJECTED: 'Rechazado', REVERSED: 'Revertido' })[movement.status] || 'Aprobado')}</span>
+                </div>
+                ${movement.reviewedBy ? `<div class="movement-detail-meta-item"><label>Revisado por</label><span>${escapeHtml(movement.reviewedBy.name)}</span></div>` : ''}
+                ${movement.rejectionReason ? `<div class="movement-detail-meta-item movement-detail-meta-item--wide"><label>Motivo de rechazo</label><span>${escapeHtml(movement.rejectionReason)}</span></div>` : ''}
                 ${movement.description ? `
                 <div class="movement-detail-meta-item movement-detail-meta-item--wide">
                     <label>Descripción</label>
@@ -1126,7 +1139,9 @@ async function printVoucher(id) {
                         .voucher-table th, .voucher-table td { border: 1px solid #000; padding: 8px; }
                         .voucher-total-row td { font-weight: bold; }
                         .voucher-total-label { text-align: right; }
-                        .signature { margin-top: 50px; }
+                        .voucher-signatures { display:grid;grid-template-columns:1fr 1fr;gap:40px;margin:55px 20px 0;text-align:center; }
+                        .signature-line { border-top:1px solid #222;margin:36px auto 8px;max-width:260px; }
+                        @media print { body { margin:12mm; } }
                     </style>
                 </head>
                 <body>
@@ -1191,6 +1206,27 @@ async function reverseMovement(id) {
     }
 }
 
+async function approveMovement(id) {
+    if (!isAdmin() || !confirm('¿Aprobar este movimiento y actualizar el inventario?')) return;
+    try {
+        await apiRequest(`/movements/${id}/approve`, { method: 'POST' });
+        showAlert('Movimiento aprobado; inventario actualizado.', 'success');
+        await loadMovements(1);
+        if (typeof loadDashboard === 'function') await loadDashboard();
+    } catch (error) { showAlert(error.message || 'No se pudo aprobar el movimiento.', 'error'); }
+}
+
+async function rejectMovement(id) {
+    if (!isAdmin()) return;
+    const reason = prompt('Motivo del rechazo (opcional):');
+    if (reason === null) return;
+    try {
+        await apiRequest(`/movements/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) });
+        showAlert('Solicitud rechazada.', 'success');
+        await loadMovements(1);
+    } catch (error) { showAlert(error.message || 'No se pudo rechazar la solicitud.', 'error'); }
+}
+
 // Crear HTML del voucher
 function createVoucherHTML(voucher, logoUrl = null) {
     const typeText = voucher.type === 'ENTRADA' ? 'ENTRADA DE PRODUCTOS' : 'SALIDA DE PRODUCTOS';
@@ -1202,6 +1238,7 @@ function createVoucherHTML(voucher, logoUrl = null) {
     const total = (voucher.details || []).reduce((sum, detail) => sum + (parseNumberSafe(detail.totalCost) || 0), 0);
     const voucherRate = parseNumberSafe(voucher.rateAtTransaction) || 1;
     
+    const statusLabel = ({ PENDING: 'Pendiente de aprobación', POSTED: 'Aprobado', REJECTED: 'Rechazado', REVERSED: 'Revertido' })[voucher.status] || 'Aprobado';
     return `
         <div class="voucher-header">
             ${logoUrl ? `<img src="${logoUrl}" alt="Logo Empresa" class="company-logo" style="max-width:140px;max-height:80px;display:block;margin:0 auto 12px;">` : ''}
@@ -1217,6 +1254,8 @@ function createVoucherHTML(voucher, logoUrl = null) {
             <p><strong>${entity}:</strong> ${entityName}</p>
             ${voucher.description ? `<p><strong>Descripción:</strong> ${voucher.description}</p>` : ''}
             <p><strong>Responsable:</strong> ${voucher.user?.name || 'N/A'}</p>
+            <p><strong>Estado:</strong> ${statusLabel}</p>
+            ${voucher.rejectionReason ? `<p><strong>Motivo de rechazo:</strong> ${escapeHtml(voucher.rejectionReason)}</p>` : ''}
         </div>
         
         <table class="voucher-table">
@@ -1248,9 +1287,9 @@ function createVoucherHTML(voucher, logoUrl = null) {
             </tbody>
         </table>
         
-        <div class="signature">
-            <p>_________________________</p>
-            <p>Firma del Responsable</p>
+        <div class="voucher-signatures">
+            <div><p class="signature-line"></p><p><strong>${escapeHtml(voucher.user?.name || 'Persona que registra')}</strong></p><p>Firma de quien registra</p></div>
+            <div><p class="signature-line"></p><p><strong>${escapeHtml(voucher.reviewedBy?.name || 'Pendiente de aprobación')}</strong></p><p>Firma del administrador que aprueba</p></div>
         </div>
     `;
 }
@@ -1299,11 +1338,9 @@ async function loadRecentMovements() {
 
         response.data.forEach(movement => {
             const row = document.createElement('tr');
-            const canDelete = isAdmin();
-
             if (compact) {
                 row.className = 'table-compact-row';
-                row.innerHTML = `<td colspan="6" class="table-compact-cell">${buildMovementListItemHtml(movement, { canDelete })}</td>`;
+                row.innerHTML = `<td colspan="7" class="table-compact-cell">${buildMovementListItemHtml(movement, { canReverse: isAdmin() && movement.status === 'POSTED', canApprove: isAdmin() && movement.status === 'PENDING' && movement.userId !== getCurrentUser()?.id })}</td>`;
                 tbody.appendChild(row);
                 return;
             }
@@ -1326,14 +1363,12 @@ async function loadRecentMovements() {
                 <td class="cell-text">${escapeHtml(movement.documentNumber || 'N/A')}</td>
                 <td class="cell-text">${escapeHtml(entity)}</td>
                 <td class="cell-currency">${buildDualCurrencyHtml(total, currency, rateAtTransaction)}</td>
+                <td class="cell-compact">${({ PENDING: 'Pendiente', POSTED: 'Aprobado', REJECTED: 'Rechazado', REVERSED: 'Revertido' })[movement.status] || 'Aprobado'}</td>
                 <td class="actions">
                     <button class="btn btn-sm btn-outline" onclick="viewMovement(${movement.id})">
                         <i class="fas fa-eye"></i>
                     </button>
-                    ${canDelete ? `
-                    <button class="btn btn-sm btn-danger" onclick="deleteMovement(${movement.id})">
-                        <i class="fas fa-trash"></i>
-                    </button>` : ''}
+                    <button class="btn btn-sm btn-outline" onclick="printVoucher(${movement.id})" title="Imprimir"><i class="fas fa-print"></i></button>
                 </td>
             `;
 
