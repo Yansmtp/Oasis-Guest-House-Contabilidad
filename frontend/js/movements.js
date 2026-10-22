@@ -219,7 +219,7 @@ function renderMovementsTable() {
                 <button class="btn btn-sm btn-outline" onclick="viewMovement(${movement.id})" title="Ver detalle">
                     <i class="fas fa-eye"></i>
                 </button>
-                ${canDelete ? `
+                ${canReverse ? `
                 <button class="btn btn-sm btn-danger" onclick="reverseMovement(${movement.id})" title="Anular">
                     <i class="fas fa-rotate-left"></i>
                 </button>` : ''}
