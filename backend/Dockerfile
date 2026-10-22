@@ -17,4 +17,4 @@ ENV NODE_ENV=production
 ENV UPLOAD_PATH=/app/uploads
 EXPOSE 3000
 
-CMD ["sh", "-c", "if [ -z \"$DIRECT_URL\" ]; then echo 'DIRECT_URL is required for Prisma migrations' >&2; exit 1; fi; DATABASE_URL=\"$DIRECT_URL\" npx prisma migrate deploy && node dist/main"]
+CMD ["sh", "-c", "if [ -z \"$DIRECT_URL\" ]; then echo 'DIRECT_URL is required for Prisma migrations' >&2; exit 1; fi; DATABASE_URL=\"$DIRECT_URL\" npx prisma migrate deploy && node dist/src/main.js"]
