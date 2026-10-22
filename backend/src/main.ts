@@ -7,6 +7,7 @@ import { AppModule } from './app.module';
 import helmet from 'helmet'; // <- cambio aquí
 import { ConfigService } from '@nestjs/config';
 import { resolveUploadsRoot } from './shared/utils/uploads-root';
+import { resolve } from 'path';
 
 @Injectable()
 class LogoUrlInterceptor implements NestInterceptor {
@@ -29,7 +30,7 @@ class LogoUrlInterceptor implements NestInterceptor {
       const out: any = {};
       for (const key of Object.keys(data)) {
         const val = data[key];
-        if (key === 'logo' && typeof val === 'string' && val.startsWith('/uploads')) {
+        if (key === 'logo' && typeof val === 'string' && /^\/(uploads|assets)\//.test(val)) {
           out[key] = `${protocol}://${host}${val}`;
         } else if (isPlainObject(val) || Array.isArray(val)) {
           out[key] = normalize(val);
@@ -101,7 +102,14 @@ async function bootstrap() {
   const uploadsRoot = resolveUploadsRoot(configService.get('UPLOAD_PATH', './uploads'));
   app.useStaticAssets(uploadsRoot, { prefix: '/uploads' });
 
-  // Interceptor global: convierte rutas de 'logo' que empiezan con '/uploads' en URLs absolutas
+  // El logo institucional forma parte del código y no depende del disco efímero de Render.
+  app.use('/assets', (req, res, next) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+  });
+  app.useStaticAssets(resolve(process.cwd(), 'assets'), { prefix: '/assets' });
+
+  // Interceptor global: convierte rutas locales de logos (assets o uploads) en URLs absolutas.
   app.useGlobalInterceptors(new LogoUrlInterceptor());
 
   const port = Number(configService.get('PORT', 3000));

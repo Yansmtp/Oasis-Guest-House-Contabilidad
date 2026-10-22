@@ -7,21 +7,17 @@ function resolveCompanyLogoUrl(logoPath) {
 
     if (/^https?:\/\//i.test(logoPath)) {
         const u = new URL(logoPath);
-        if (!u.pathname.startsWith('/uploads/')) return null;
+        if (!/^\/(uploads|assets)\//.test(u.pathname)) return null;
         return `${u.origin}${u.pathname}`;
     }
 
     const normalized = String(logoPath).replace(/\\/g, '/');
-    if (normalized.startsWith('/uploads/')) {
+    if (/^\/(uploads|assets)\//.test(normalized)) {
         return `${backendBase}${normalized}`;
-    }
-    if (normalized.includes('/uploads/')) {
-        return `${backendBase}${normalized.substring(normalized.indexOf('/uploads/'))}`;
     }
 
     return null;
 }
-let selectedLogoFile = null;
 let currentCompanyId = 1;
 
 // Cargar información de la empresa
@@ -86,103 +82,6 @@ async function saveCompanyInfo() {
         
     } catch (error) {
         showAlert(error.message || 'Error al guardar la información de la empresa', 'error');
-    }
-}
-
-// Subir logo de la empresa
-async function uploadLogo() {
-    const companyId = currentCompanyId || 1;
-    const fileInput = document.getElementById('logo-file');
-
-    if (!fileInput) {
-        console.error('uploadLogo: elemento #logo-file no encontrado');
-        showAlert('Elemento de archivo no encontrado', 'error');
-        return;
-    }
-
-    const file = (fileInput.files && fileInput.files[0]) ? fileInput.files[0] : selectedLogoFile;
-
-    if (!file) {
-        showAlert('Por favor, seleccione un archivo', 'warning');
-        return;
-    }
-
-    // Validar tipo de archivo
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/svg+xml'];
-    if (!validTypes.includes(file.type)) {
-        showAlert('Solo se permiten archivos JPG, PNG o SVG', 'error');
-        return;
-    }
-
-    // Validar tamaño (5MB)
-    if (file.size > 5 * 1024 * 1024) {
-        showAlert('El archivo no debe superar los 5MB', 'error');
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append('logo', file, file.name || 'logo.png');
-
-    try {
-        // Validaciones básicas de entorno
-        if (typeof API_BASE_URL === 'undefined') {
-            throw new Error('API_BASE_URL no está definido en la aplicación');
-        }
-
-        const token = (typeof getToken === 'function') ? getToken() : null;
-        const headers = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-
-        console.log('uploadLogo: enviando a', `${API_BASE_URL}/company/${companyId}/logo`, 'headers', !!token);
-
-        let response = await fetch(`${API_BASE_URL}/company/${companyId}/logo`, {
-            method: 'PUT',
-            headers,
-            body: formData
-        });
-
-        // Si el servidor rechaza PUT (405) o devuelve error, reintentar con POST
-        if (!response.ok) {
-            if (response.status === 405) {
-                console.warn('PUT no soportado, reintentando con POST');
-                response = await fetch(`${API_BASE_URL}/company/${companyId}/logo`, {
-                    method: 'POST',
-                    headers,
-                    body: formData
-                });
-            }
-        }
-
-        if (!response.ok) {
-            // Intentar leer cuerpo con detalle del error
-            let errDetails = '';
-            try {
-                const errJson = await response.json();
-                errDetails = errJson.message || errJson.error || JSON.stringify(errJson);
-            } catch (e) {
-                errDetails = await response.text();
-            }
-            throw new Error(`Error ${response.status}: ${response.statusText} - ${errDetails}`);
-        }
-
-        const result = await response.json();
-        console.log('uploadLogo: respuesta', result);
-
-        const logoPath = result.logo || result.path || result.filename || null;
-        if (!logoPath) {
-            console.warn('uploadLogo: la API no devolvió una URL de logo', result);
-        }
-
-        showAlert('Logo actualizado exitosamente', 'success');
-        await loadCompanyInfo();
-
-        // Limpiar input de archivo
-        fileInput.value = '';
-        selectedLogoFile = null;
-
-    } catch (error) {
-        console.error('Error uploading logo:', error);
-        showAlert(error.message || 'Error al subir el logo', 'error');
     }
 }
 
@@ -368,18 +267,6 @@ document.addEventListener('DOMContentLoaded', () => {
             saveCompanyInfo();
         });
         
-        // Formulario de logo
-        document.getElementById('logo-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            uploadLogo();
-        });
-        const logoFileInput = document.getElementById('logo-file');
-        if (logoFileInput) {
-            logoFileInput.addEventListener('change', () => {
-                selectedLogoFile = (logoFileInput.files && logoFileInput.files[0]) ? logoFileInput.files[0] : null;
-            });
-        }
-
         const currencyForm = document.getElementById('currency-form');
         if (currencyForm) {
             currencyForm.addEventListener('submit', (e) => {

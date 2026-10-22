@@ -1176,10 +1176,8 @@ async function getCompanyLogoForDocument() {
         if (/^https?:\/\//i.test(logoUrl)) {
             const u = new URL(logoUrl);
             logoUrl = `${u.origin}${u.pathname}`;
-        } else if (logoUrl.startsWith('/uploads/')) {
+        } else if (/^\/(uploads|assets)\//.test(logoUrl)) {
             logoUrl = `${backendBase}${logoUrl}`;
-        } else if (logoUrl.includes('/uploads/')) {
-            logoUrl = `${backendBase}${logoUrl.substring(logoUrl.indexOf('/uploads/'))}`;
         } else {
             return null;
         }

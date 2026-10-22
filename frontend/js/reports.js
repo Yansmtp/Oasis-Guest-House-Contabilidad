@@ -46,16 +46,17 @@ function normalizeLogoUrl(logoPath) {
 
     if (/^https?:\/\//i.test(logoPath)) {
         const u = new URL(logoPath);
-        if (!u.pathname.startsWith('/uploads/')) return null;
+        if (!/^\/(uploads|assets)\//.test(u.pathname)) return null;
         return `${u.origin}${u.pathname}`;
     }
 
     const normalized = String(logoPath).replace(/\\/g, '/');
-    if (normalized.startsWith('/uploads/')) {
+    if (/^\/(uploads|assets)\//.test(normalized)) {
         return `${backendBase}${normalized}`;
     }
-    if (normalized.includes('/uploads/')) {
-        return `${backendBase}${normalized.substring(normalized.indexOf('/uploads/'))}`;
+    const resourcePath = normalized.match(/\/(uploads|assets)\//);
+    if (resourcePath) {
+        return `${backendBase}${normalized.substring(resourcePath.index)}`;
     }
 
     return null;

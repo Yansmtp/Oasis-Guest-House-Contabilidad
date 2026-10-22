@@ -1379,11 +1379,6 @@ h3 {
     min-height: 100%;
 }
 
-.company-logo-form {
-    width: min(440px, 100%);
-    margin: 0 auto;
-}
-
 .company-actions-row {
     display: flex;
     flex-wrap: wrap;
@@ -1639,10 +1634,6 @@ h3 {
 
     .company-actions-wrap .btn,
     .company-actions-row .btn {
-        width: 100%;
-    }
-
-    .company-logo-form {
         width: 100%;
     }
 
