@@ -96,14 +96,14 @@ function buildMovementListItemHtml(movement, options = {}) {
     `;
 
     return `
-        <div class="list-item-card">
+        <div class="list-item-card list-item-card--movement">
             <div class="list-item-body">
-                <div class="list-item-top">
+                <div class="list-item-top list-item-top--movement">
                     <span class="status-badge ${typeClass}">${isReversed ? 'Anulado · ' : ''}${typeLabel}</span>
                     <span class="status-badge">${escapeHtml(statusLabel)}</span>
-                    <span class="list-item-date">${escapeHtml(formatDate(movement.date))}</span>
                 </div>
                 <div class="list-item-title">${escapeHtml(movement.documentNumber || 'Sin documento')}</div>
+                <div class="list-item-date"><i class="fas fa-clock" aria-hidden="true"></i><span>${escapeHtml(formatDate(movement.date))}</span></div>
                 <div class="list-item-sub">${escapeHtml(party)}</div>
                 <div class="list-item-meta">
                     <span>${productCount} producto(s)</span>

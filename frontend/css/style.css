@@ -2215,9 +2215,15 @@ h3 {
     .list-item-top {
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        justify-content: flex-start;
+        flex-wrap: wrap;
         gap: 8px;
         margin-bottom: 4px;
+    }
+
+    .list-item-top > * {
+        min-width: 0;
+        max-width: 100%;
     }
 
     .list-item-code,
@@ -2227,6 +2233,25 @@ h3 {
         color: var(--gray-color);
         letter-spacing: 0.02em;
     }
+
+    .list-item-code { overflow-wrap: anywhere; }
+
+    .list-item-date {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        min-width: 0;
+        margin: 3px 0 6px;
+        color: var(--text-muted);
+        font-size: 0.8rem;
+        font-weight: 500;
+        letter-spacing: 0;
+        line-height: 1.35;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .list-item-date i { flex: 0 0 auto; color: var(--primary-color); }
+    .list-item-date span { min-width: 0; overflow-wrap: normal; word-break: normal; }
 
     .list-item-title {
         font-size: 0.98rem;
@@ -2285,6 +2310,19 @@ h3 {
         height: 38px;
         padding: 0;
         justify-content: center;
+    }
+
+    /* En móviles las acciones van debajo del contenido; así no estrechan fechas ni textos. */
+    .list-item-card:not(.list-item-card--detail) {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .list-item-card:not(.list-item-card--detail) .list-item-actions {
+        flex-direction: row;
+        justify-content: flex-end;
+        padding-top: 8px;
+        border-top: 1px solid var(--surface-border-color);
     }
 
     .detail-fields-row {
@@ -2992,4 +3030,5 @@ textarea { max-width: 100%; }
     .section-header h1 { font-size: 1.2rem; }
     .accounting-tabs { grid-template-columns: 1fr; }
     .accounting-tab:last-child:nth-child(odd) { grid-column: auto; }
+    .list-item-card { padding: 10px 11px; }
 }
