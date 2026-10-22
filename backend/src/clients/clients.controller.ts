@@ -4,6 +4,7 @@ import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import { JwtAuthGuard } from '../shared/guards/jwt-auth.guard';
 import { AdminRoleGuard } from '../shared/guards/admin-role.guard';
+import { parseBusinessDate } from '../shared/utils/business-date';
 
 @Controller('clients')
 @UseGuards(JwtAuthGuard)
@@ -47,8 +48,8 @@ export class ClientsController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    const start = startDate ? new Date(startDate) : undefined;
-    const end = endDate ? new Date(endDate) : undefined;
+    const start = parseBusinessDate(startDate);
+    const end = parseBusinessDate(endDate, true);
     
     return this.clientsService.getClientMovements(+id, start, end);
   }

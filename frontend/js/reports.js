@@ -16,6 +16,50 @@ var parseNumberSafe = window.parseNumberSafe || function (value) {
     return isNaN(n) ? 0 : n;
 };
 
+function localDateInputValue(date = new Date()) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function bindDateRangeControls(root = document) {
+    root.querySelectorAll('[data-date-range]').forEach((range) => {
+        const start = document.getElementById(range.dataset.start);
+        const end = document.getElementById(range.dataset.end);
+        if (!start || !end) return;
+
+        const syncLimits = () => {
+            start.max = end.value || '';
+            end.min = start.value || '';
+        };
+        start.addEventListener('change', syncLimits);
+        end.addEventListener('change', syncLimits);
+        syncLimits();
+
+        range.querySelectorAll('[data-range-preset]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const today = new Date();
+                let from;
+                switch (button.dataset.rangePreset) {
+                    case 'today': from = today; break;
+                    case '7days': from = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6); break;
+                    case 'month': from = new Date(today.getFullYear(), today.getMonth(), 1); break;
+                    case 'year': from = new Date(today.getFullYear(), 0, 1); break;
+                    default: return;
+                }
+                start.value = localDateInputValue(from);
+                end.value = localDateInputValue(today);
+                syncLimits();
+                range.querySelectorAll('[data-range-preset]').forEach(item => item.classList.toggle('is-active', item === button));
+            });
+        });
+        [start, end].forEach(input => input.addEventListener('input', () => {
+            range.querySelectorAll('[data-range-preset]').forEach(button => button.classList.remove('is-active'));
+        }));
+    });
+}
+
 async function loadCurrencyOptions(selectId, selectedCode = 'USD') {
     try {
         const response = await apiRequest('/currencies');
@@ -687,6 +731,8 @@ async function showStockForecast(period = 'monthly', historyMonths = 3, status =
 // Mostrar reporte de movimientos
 async function showMovementsReport() {
     lastMovementsReportContext = null;
+    const today = new Date();
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
     const html = `
         <div class="card movements-report-panel">
             <div class="card-header movements-report-header">
@@ -694,18 +740,21 @@ async function showMovementsReport() {
             </div>
             <div class="card-body movements-report-body">
                 <div class="row movements-report-filters">
-                    <div class="col-md-3">
-                        <div class="form-group">
-                            <label>Fecha Inicio</label>
-                            <input type="date" id="movement-report-start" class="form-control" 
-                                   value="${new Date().toISOString().split('T')[0]}">
+                        <div class="col-md-3 date-range-field">
+                            <label for="movement-report-start">Desde</label>
+                            <div class="date-input-shell"><i class="fas fa-calendar-day" aria-hidden="true"></i><input type="date" id="movement-report-start" class="form-control" value="${localDateInputValue(monthStart)}"></div>
                         </div>
+                    <div class="col-md-3 date-range-field">
+                        <label for="movement-report-end">Hasta</label>
+                        <div class="date-input-shell"><i class="fas fa-calendar-check" aria-hidden="true"></i><input type="date" id="movement-report-end" class="form-control" value="${localDateInputValue()}"></div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="form-group">
-                            <label>Fecha Fin</label>
-                            <input type="date" id="movement-report-end" class="form-control" 
-                                   value="${new Date().toISOString().split('T')[0]}">
+                    <div class="col-md-6 date-range-presets-wrap">
+                        <div class="date-range-presets" data-date-range data-start="movement-report-start" data-end="movement-report-end" aria-label="Período rápido">
+                            <span>Período rápido</span>
+                            <button type="button" data-range-preset="today">Hoy</button>
+                            <button type="button" data-range-preset="7days">7 días</button>
+                            <button type="button" data-range-preset="month" class="is-active">Este mes</button>
+                            <button type="button" data-range-preset="year">Este año</button>
                         </div>
                     </div>
                     <div class="col-md-3">
@@ -766,6 +815,7 @@ async function showMovementsReport() {
     `;
     
     mountReportHtml('report-content', html);
+    bindDateRangeControls(document.getElementById('report-content'));
     await Promise.all([
         loadCurrencyOptions('movement-report-currency', 'USD'),
         loadSelectOptionsFromApi('movement-report-client', '/clients?activeOnly=true&limit=1000', 'Todos los proveedores'),
@@ -799,6 +849,10 @@ async function generateMovementsReport() {
     
     if (!startDate || !endDate) {
         showAlert('Por favor, seleccione ambas fechas', 'warning');
+        return;
+    }
+    if (startDate > endDate) {
+        showAlert('La fecha inicial no puede ser posterior a la fecha final.', 'warning');
         return;
     }
     
@@ -1197,16 +1251,21 @@ async function showClientReport() {
                                 </select>
                             </div>
                         </div>
-                        <div class="col-md-3">
-                            <div class="form-group">
-                                <label>Fecha Inicio</label>
-                                <input type="date" id="client-report-start" class="form-control">
-                            </div>
+                        <div class="col-md-3 date-range-field">
+                            <label for="client-report-start">Desde</label>
+                            <div class="date-input-shell"><i class="fas fa-calendar-day" aria-hidden="true"></i><input type="date" id="client-report-start" class="form-control"></div>
                         </div>
-                        <div class="col-md-3">
-                            <div class="form-group">
-                                <label>Fecha Fin</label>
-                                <input type="date" id="client-report-end" class="form-control">
+                        <div class="col-md-3 date-range-field">
+                            <label for="client-report-end">Hasta</label>
+                            <div class="date-input-shell"><i class="fas fa-calendar-check" aria-hidden="true"></i><input type="date" id="client-report-end" class="form-control"></div>
+                        </div>
+                        <div class="col-md-6 date-range-presets-wrap">
+                            <div class="date-range-presets" data-date-range data-start="client-report-start" data-end="client-report-end" aria-label="Período rápido">
+                                <span>Período rápido</span>
+                                <button type="button" data-range-preset="today">Hoy</button>
+                                <button type="button" data-range-preset="7days">7 días</button>
+                                <button type="button" data-range-preset="month">Este mes</button>
+                                <button type="button" data-range-preset="year">Este año</button>
                             </div>
                         </div>
                         <div class="col-md-3">
@@ -1231,6 +1290,7 @@ async function showClientReport() {
         `;
         
         mountReportHtml('report-content', html);
+        bindDateRangeControls(document.getElementById('report-content'));
         await loadCurrencyOptions('client-report-currency', 'USD');
         
     } catch (error) {
@@ -1245,6 +1305,11 @@ async function generateClientReport() {
     const startDate = document.getElementById('client-report-start').value;
     const endDate = document.getElementById('client-report-end').value;
     const currency = document.getElementById('client-report-currency')?.value || 'USD';
+
+    if (startDate && endDate && startDate > endDate) {
+        showAlert('La fecha inicial no puede ser posterior a la fecha final.', 'warning');
+        return;
+    }
     
     if (!clientId) {
         showAlert('Por favor, seleccione un cliente', 'warning');

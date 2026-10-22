@@ -45,6 +45,17 @@ export class AccountingService {
     return normalized;
   }
 
+  private currentAccountingDate(): Date {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Havana',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(new Date());
+    const part = (type: string) => parts.find(value => value.type === type)?.value || '';
+    return new Date(`${part('year')}-${part('month')}-${part('day')}T00:00:00.000Z`);
+  }
+
   private formatEntryNumber(entryNumber: number): string {
     return `JE-${String(entryNumber).padStart(8, '0')}`;
   }
@@ -294,8 +305,15 @@ export class AccountingService {
   }
 
   async createJournalEntry(actorId: number, dto: CreateJournalEntryDto) {
-    const date = this.normalizeDate(dto.date);
-    const description = dto.description.trim();
+    // La fecha contable de un asiento nuevo es el día actual del servidor (normalizado a UTC).
+    const date = this.currentAccountingDate();
+    const rawDescription = dto.description.trim();
+    if (dto.isAdjustment && !rawDescription) {
+      throw new BadRequestException('Describa el ajuste e indique la fecha real del hecho corregido');
+    }
+    const description = dto.isAdjustment && !/^ajuste de asiento:/i.test(rawDescription)
+      ? `AJUSTE DE ASIENTO: ${rawDescription}`
+      : rawDescription;
     if (!description) throw new BadRequestException('La descripción del asiento es obligatoria');
     if (dto.kind === JournalEntryKind.REVERSAL || dto.kind === JournalEntryKind.INVENTORY_MOVEMENT) {
       throw new BadRequestException('Este tipo de asiento solo puede generarse desde el flujo contable correspondiente');

@@ -4,6 +4,7 @@ import { CreateMovementDto } from './dto/create-movement.dto';
 import { JwtAuthGuard } from '../shared/guards/jwt-auth.guard';
 import { AdminRoleGuard } from '../shared/guards/admin-role.guard';
 import { InventoryWriteGuard } from '../shared/guards/inventory-write.guard';
+import { parseBusinessDate } from '../shared/utils/business-date';
 
 @Controller('movements')
 @UseGuards(JwtAuthGuard)
@@ -28,8 +29,8 @@ export class MovementsController {
     @Query('clientId') clientId?: string,
     @Query('costCenterId') costCenterId?: string,
   ) {
-    const start = startDate ? new Date(startDate) : undefined;
-    const end = endDate ? new Date(endDate) : undefined;
+    const start = parseBusinessDate(startDate);
+    const end = parseBusinessDate(endDate, true);
 
     return this.movementsService.findAll(
       parseInt(page),
@@ -62,11 +63,8 @@ export class MovementsController {
       throw new BadRequestException('startDate and endDate are required');
     }
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-
-    // Asegurar que el 'end' incluya todo el día (hasta 23:59:59.999)
-    end.setHours(23, 59, 59, 999);
+    const start = parseBusinessDate(startDate);
+    const end = parseBusinessDate(endDate, true);
 
     return this.movementsService.getMovementsReport(
       start,

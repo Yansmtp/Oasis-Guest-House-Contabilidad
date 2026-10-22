@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString, IsNumber, IsArray, ValidateNested, IsDate, IsInt, Min } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsNumber, IsArray, ValidateNested, IsDate, IsInt, Min, IsBoolean, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
 import { MovementType } from '@prisma/client';
 import { MovementDetailDto } from './movement-detail.dto';
@@ -18,7 +18,12 @@ export class CreateMovementDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(500)
   description?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isAdjustment?: boolean;
 
   @IsNumber()
   @IsOptional()

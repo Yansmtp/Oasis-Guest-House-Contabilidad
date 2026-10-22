@@ -9,6 +9,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsBoolean,
   MaxLength,
   Min,
   ValidateNested,
@@ -73,6 +74,10 @@ export class CreateJournalEntryDto {
   @IsString()
   @MaxLength(500)
   description: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isAdjustment?: boolean;
 
   @IsString()
   @IsOptional()

@@ -201,7 +201,15 @@ export class MovementsService {
     }
 
     return await this.prisma.$transaction(async (tx) => {
-      const movementDate = createMovementDto.date || new Date();
+      // La hora del servidor es la única fuente de verdad; nunca aceptar fechas retroactivas del cliente.
+      const movementDate = new Date();
+      const movementDescription = createMovementDto.description?.trim();
+      if (createMovementDto.isAdjustment && !movementDescription) {
+        throw new BadRequestException('Describa el ajuste de asiento e indique en el comentario la fecha real del hecho corregido');
+      }
+      const description = createMovementDto.isAdjustment
+        ? `AJUSTE DE ASIENTO: ${movementDescription}`
+        : (movementDescription || undefined);
       const company = await tx.company.findFirst({
         orderBy: { id: 'asc' },
         select: { accountingCutoverAt: true },
@@ -255,7 +263,7 @@ export class MovementsService {
           type: createMovementDto.type,
           date: movementDate,
           documentNumber: requestedDocumentNumber || null,
-          description: createMovementDto.description,
+          description,
           clientId: createMovementDto.clientId,
           costCenterId: createMovementDto.costCenterId,
           counterpartAccountId: createMovementDto.counterpartAccountId,
@@ -365,7 +373,7 @@ export class MovementsService {
           movementId: movement.id,
           actorId: userId,
           date: movementDate,
-          description: createMovementDto.description,
+          description,
           documentNumber,
           type: createMovementDto.type,
           currencyCode,

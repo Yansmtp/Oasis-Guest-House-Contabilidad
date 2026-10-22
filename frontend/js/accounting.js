@@ -365,7 +365,7 @@ function renderJournalEntriesTable(entries) {
         return `
         <tr>
             <td><strong>${escapeHtml(number)}</strong></td>
-            <td>${formatDate(e.date)}</td>
+            <td>${formatDate(String(e.date).slice(0, 10))}</td>
             <td>
                 ${escapeHtml(e.description)}
                 ${e.reference ? `<br><small class="text-muted">Ref: ${escapeHtml(e.reference)}</small>` : ''}
@@ -386,7 +386,8 @@ function openJournalEntryModal() {
     const form = document.getElementById('journal-entry-form');
     if (form) form.reset();
 
-    document.getElementById('journal-entry-date').value = new Date().toISOString().slice(0, 10);
+    const dateDisplay = document.querySelector('#journal-entry-date-display span');
+    if (dateDisplay) dateDisplay.textContent = `Hoy · ${new Date().toLocaleDateString('es-CU')}`;
     document.getElementById('journal-entry-modal-title').textContent = 'Nuevo Asiento Contable';
     journalEntryDraftLines = [
         { accountId: '', costCenterId: '', description: '', debit: 0, credit: 0 },
@@ -533,10 +534,11 @@ function closeJournalEntryModal() {
 }
 
 async function saveJournalEntry() {
-    const date = document.getElementById('journal-entry-date').value;
+    const date = new Date().toISOString().slice(0, 10);
     const description = (document.getElementById('journal-entry-description').value || '').trim();
     const reference = (document.getElementById('journal-entry-reference').value || '').trim();
     const kind = document.getElementById('journal-entry-kind').value;
+    const isAdjustment = !!document.getElementById('journal-entry-adjustment')?.checked;
 
     if (!date || !description) {
         showAlert('La fecha y la descripción son obligatorias', 'warning');
@@ -578,6 +580,7 @@ async function saveJournalEntry() {
             body: JSON.stringify({
                 date,
                 description,
+                isAdjustment,
                 reference: reference || undefined,
                 kind,
                 lines
@@ -602,7 +605,7 @@ async function viewJournalEntry(id) {
         document.getElementById('journal-detail-title').textContent = `${number} · ${entry.description}`;
         document.getElementById('journal-detail-content').innerHTML = `
             <div class="row mb-3">
-                <div class="col-md-3"><strong>Fecha:</strong> ${formatDate(entry.date)}</div>
+                <div class="col-md-3"><strong>Fecha:</strong> ${formatDate(String(entry.date).slice(0, 10))}</div>
                 <div class="col-md-3"><strong>Tipo:</strong> ${JOURNAL_KINDS[entry.kind] || escapeHtml(entry.kind)}</div>
                 <div class="col-md-3"><strong>Estado:</strong>
                     <span class="status-badge ${entry.status === 'POSTED' ? 'status-active' : 'status-inactive'}">

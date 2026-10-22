@@ -1040,8 +1040,8 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label>Fecha *</label>
-                                <input type="datetime-local" id="movement-date" class="form-control" required>
+                                <label>Fecha y hora del registro</label>
+                                <div class="date-stamp-display" id="movement-date-display"><i class="fas fa-clock" aria-hidden="true"></i><span>La asigna el servidor al guardar</span></div>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -1053,8 +1053,12 @@
                     </div>
                     <div class="form-group">
                         <label>Descripción</label>
-                        <textarea id="movement-description" class="form-control" rows="2"></textarea>
+                        <textarea id="movement-description" class="form-control" rows="2" maxlength="500" placeholder="Motivo o detalle del movimiento"></textarea>
                     </div>
+                    <label class="adjustment-option" for="movement-adjustment">
+                        <input type="checkbox" id="movement-adjustment">
+                        <span><strong>Es un ajuste de asiento</strong><small>Explique el ajuste e indique en el comentario cuándo ocurrió el hecho original. El registro conservará la fecha y hora actuales.</small></span>
+                    </label>
                     <div class="row" id="movement-currency-row" style="display: none;">
                         <div class="col-md-6">
                             <div class="form-group">
@@ -1588,8 +1592,8 @@
                     <div class="row">
                         <div class="col-md-3">
                             <div class="form-group">
-                                <label>Fecha *</label>
-                                <input type="date" id="journal-entry-date" class="form-control" required>
+                                <label>Fecha contable</label>
+                                <div class="date-stamp-display" id="journal-entry-date-display"><i class="fas fa-calendar-day" aria-hidden="true"></i><span>Hoy · se asigna al guardar</span></div>
                             </div>
                         </div>
                         <div class="col-md-3">
@@ -1612,6 +1616,10 @@
                         <label>Descripción *</label>
                         <textarea id="journal-entry-description" class="form-control" rows="2" maxlength="500" required></textarea>
                     </div>
+                    <label class="adjustment-option" for="journal-entry-adjustment">
+                        <input type="checkbox" id="journal-entry-adjustment">
+                        <span><strong>Es un ajuste de asiento</strong><small>Explique el ajuste e indique la fecha del hecho original. El asiento se fechará hoy.</small></span>
+                    </label>
 
                     <div class="movement-details-toolbar">
                         <h4 class="movement-details-title">Partidas (débito / crédito)</h4>

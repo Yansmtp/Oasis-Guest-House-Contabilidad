@@ -2,6 +2,7 @@ import { Controller, Get, Query, Param, UseGuards, Res, BadRequestException } fr
 import { ReportsService } from './reports.service';
 import { JwtAuthGuard } from '../shared/guards/jwt-auth.guard';
 import { Response } from 'express';
+import { parseBusinessDate } from '../shared/utils/business-date';
 
 @Controller('reports')
 @UseGuards(JwtAuthGuard)
@@ -12,11 +13,11 @@ export class ReportsController {
     if (!value) {
       throw new BadRequestException(`${fieldName} es obligatorio`);
     }
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) {
-      throw new BadRequestException(`${fieldName} no es una fecha valida`);
+    try {
+      return parseBusinessDate(value)!;
+    } catch {
+      throw new BadRequestException(`${fieldName} no es una fecha válida`);
     }
-    return d;
   }
 
   @Get('stock')
@@ -103,8 +104,8 @@ export class ReportsController {
     @Query('endDate') endDate?: string,
     @Query('currency') currency?: string,
   ) {
-    const start = startDate ? new Date(startDate) : undefined;
-    const end = endDate ? new Date(endDate) : undefined;
+    const start = parseBusinessDate(startDate);
+    const end = parseBusinessDate(endDate, true);
     
     return this.reportsService.getClientReport(+id, start, end, currency || 'USD');
   }
@@ -116,8 +117,8 @@ export class ReportsController {
     @Query('endDate') endDate?: string,
     @Query('currency') currency?: string,
   ) {
-    const start = startDate ? new Date(startDate) : undefined;
-    const end = endDate ? new Date(endDate) : undefined;
+    const start = parseBusinessDate(startDate);
+    const end = parseBusinessDate(endDate, true);
     
     return this.reportsService.getCostCenterReport(+id, start, end, currency || 'USD');
   }
@@ -128,8 +129,8 @@ export class ReportsController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    const start = startDate ? new Date(startDate) : undefined;
-    const end = endDate ? new Date(endDate) : undefined;
+    const start = parseBusinessDate(startDate);
+    const end = parseBusinessDate(endDate, true);
     
     return this.reportsService.getProductMovementHistory(+id, start, end);
   }
@@ -145,8 +146,7 @@ export class ReportsController {
     @Query('costCenterId') costCenterId?: string,
   ) {
     const start = this.parseRequiredDate(startDate, 'startDate');
-    const end = this.parseRequiredDate(endDate, 'endDate');
-    end.setHours(23, 59, 59, 999);
+    const end = parseBusinessDate(endDate, true)!;
 
     const exportFile = await this.reportsService.exportMovementsReportExcel({
       startDate: start,
@@ -174,8 +174,7 @@ export class ReportsController {
     @Query('invoiceNumber') invoiceNumber?: string,
   ) {
     const start = this.parseRequiredDate(startDate, 'startDate');
-    const end = this.parseRequiredDate(endDate, 'endDate');
-    end.setHours(23, 59, 59, 999);
+    const end = parseBusinessDate(endDate, true)!;
 
     const exportFile = await this.reportsService.exportMovementsInvoiceExcel({
       startDate: start,
