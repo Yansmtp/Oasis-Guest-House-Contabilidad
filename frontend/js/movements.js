@@ -1253,9 +1253,9 @@ function createVoucherHTML(voucher, logoUrl = null) {
         <div class="voucher-details">
             <p><strong>${entity}:</strong> ${entityName}</p>
             ${voucher.description ? `<p><strong>Descripción:</strong> ${voucher.description}</p>` : ''}
-            <p><strong>Registrado por:</strong> ${escapeHtml(voucher.user?.name || 'N/A')}${voucher.user?.email ? ` · ${escapeHtml(voucher.user.email)}` : ''}</p>
+            <p><strong>Registrado por:</strong> ${escapeHtml(voucher.user?.name || 'N/A')}</p>
             <p><strong>Estado:</strong> ${statusLabel}</p>
-            ${voucher.reviewedBy ? `<p><strong>Aprobado por:</strong> ${escapeHtml(voucher.reviewedBy.name || 'Administrador')}${voucher.reviewedBy.email ? ` · ${escapeHtml(voucher.reviewedBy.email)}` : ''}</p><p><strong>Fecha de aprobación:</strong> ${escapeHtml(formatDate(voucher.reviewedAt))}</p>` : '<p><strong>Aprobación:</strong> Pendiente de revisión administrativa</p>'}
+            ${voucher.reviewedBy ? `<p><strong>Aprobado por:</strong> ${escapeHtml(voucher.reviewedBy.name || 'Administrador')}</p><p><strong>Fecha de aprobación:</strong> ${escapeHtml(formatDate(voucher.reviewedAt))}</p>` : '<p><strong>Aprobación:</strong> Pendiente de revisión administrativa</p>'}
             ${voucher.rejectionReason ? `<p><strong>Motivo de rechazo:</strong> ${escapeHtml(voucher.rejectionReason)}</p>` : ''}
         </div>
         
@@ -1289,8 +1289,8 @@ function createVoucherHTML(voucher, logoUrl = null) {
         </table>
         
         <div class="voucher-signatures">
-            <div><p class="signature-line"></p><p><strong>${escapeHtml(voucher.user?.name || 'Persona que registra')}</strong></p><p>${escapeHtml(voucher.user?.email || '')}</p><p>Firma de quien registra</p></div>
-            <div><p class="signature-line"></p><p><strong>${escapeHtml(voucher.reviewedBy?.name || 'Pendiente de aprobación')}</strong></p><p>${escapeHtml(voucher.reviewedBy?.email || '')}</p><p>Firma del administrador que aprueba</p></div>
+            <div><p class="signature-line"></p><p><strong>${escapeHtml(voucher.user?.name || 'Persona que registra')}</strong></p><p>Firma de quien registra</p></div>
+            <div><p class="signature-line"></p><p><strong>${escapeHtml(voucher.reviewedBy?.name || 'Pendiente de aprobación')}</strong></p><p>Firma del administrador que aprueba</p></div>
         </div>
     `;
 }
